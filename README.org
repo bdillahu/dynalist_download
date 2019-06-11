@@ -1,0 +1,29 @@
+* Initial setup
+** Install pipenv
+- https://realpython.com/pipenv-guide/
+
+#+BEGIN_SRC shell
+sudo pip3 install pipenv
+#+END_SRC
+
+** Set up virtual environment
+
+#+BEGIN_SRC shell
+pipenv --three shell
+pipenv install requests
+#+END_SRC
+
+** To run a command in the environment
+
+#+BEGIN_SRC shell
+pipenv --three shell
+<command>
+#+END_SRC
+
+-or-
+
+without launching a shell
+
+#+BEGIN_SRC shell
+pipenv run <command>
+#+END_SRC
