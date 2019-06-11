@@ -1,5 +1,8 @@
 #!env python3
 
+
+# for debugging, run 'pudb3' with command line you want
+
 import logging
 import urllib.request
 import json
@@ -45,22 +48,35 @@ def get_data(args):
         r = requests.post(Dynalist_read_url, json = payload)
         logger.debug("RESPONSE: " + r.text)
         return r
-        
+
+    # Get list of all documents
     if args.list:
         raw_doc_list = list_docs()
         doc_list = json.loads(raw_doc_list.text)
         print(json.dumps(doc_list, indent=4))
+
+    # Get contents of file(s) based on file_id received from the all-docs list
     if args.file:
         for file_id in args.file:
             raw_file_contents = file_content(file_id)
             file_contents = json.loads(raw_file_contents.text)
             print(json.dumps(file_contents, indent=4))
+
+    # Dump everything
     if args.dump_all:
-        doc_list = list_docs()
-        # somehow parse that
-        for file_id in doc_list_parsed:
-            file_contents = file_content(file_id)
-            print(file_contents.text)
+        raw_doc_list = list_docs()
+        doc_list = json.loads(raw_doc_list.text)
+        print(f"Root File ID: {doc_list['root_file_id']}")
+        for file in doc_list['files']:
+            if file['type'] == 'folder':
+                print(f"    Folder: {file['id']} - {file['title']} - {file['type']}")
+                for child in file['children']:
+                    # https://stackoverflow.com/questions/8653516/python-list-of-dictionaries-search
+                    data = next(item for item in doc_list['files'] if item['id'] == child)
+                    print(f"        File: {data['id']} - {data['title']} - {datau['type']}")
+#        for file_id in doc_list.files:
+#            file_contents = file_content(file_id)
+#            print(file_contents.text)
 
 
 
@@ -79,7 +95,7 @@ def get_parser():
     parser.add_argument("--file",
                         help="Download contents of file - can appear multiple times",
                         action="append")
-    parser.add_argument("--dump_all", 
+    parser.add_argument("--dump-all", 
                         help="Dump contents of all documents",
                         action="store_true")
     parser.set_defaults(func=get_data)
