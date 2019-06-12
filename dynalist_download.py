@@ -27,11 +27,14 @@ def output(args, raw_json, level):
     # central output dispatcher
     logger.info("called output")
 
-    def output_json(raw_json):
+    def output_json_raw(raw_json):
         logger.info("called output_json")
 
         print(raw_json)
-        
+
+    def output_json_pretty(raw_json):
+        logger.info("called output_json")
+        print(json.dumps(raw_json, indent=4))        
 
     def output_plain(raw_json, level):
         logger.info("called output_json")
@@ -57,7 +60,9 @@ def output(args, raw_json, level):
 
     for format in args.format:
         if format == 'json':
-            output_json(raw_json)
+            output_json_pretty(raw_json)
+        elif format == 'json-raw':
+            output_json_raw(raw_json)
         elif format == 'plain':
             output_plain(raw_json, level)
         elif format == 'orgmode':
@@ -107,7 +112,8 @@ def get_data(args):
     if args.list:
         raw_doc_list = list_docs()
         doc_list = json.loads(raw_doc_list.text)
-        print(json.dumps(doc_list, indent=4))
+        #print(json.dumps(doc_list, indent=4))
+        output(args, doc_list, 0)
 
     # Get contents of file(s) based on file_id received from the all-docs list
     if args.file:
@@ -121,13 +127,18 @@ def get_data(args):
         raw_doc_list = list_docs()
         doc_list = json.loads(raw_doc_list.text)
         logger.info(f"Root File ID: {doc_list['root_file_id']}")
+        #if any(item in args.format for item in ['json', 'json-raw']):
         if 'json' in args.format:
             output(args, doc_list, 0)
             args.format.remove('json')
+        elif 'json-raw' in args.format:
+            output(args, doc_list, 0)
+            args.format.remove('json-raw')
         if args.format:
             # there are still other formats being requested
             walk_tree(args, doc_list, doc_list['root_file_id'], 0)
-        
+
+            
 #        for file in doc_list['files']:
 #            if file['type'] == 'folder':
 #                print(f"    Folder: {file['id']} - {file['title']} - {file['type']}")
@@ -163,7 +174,7 @@ def get_parser():
                         action="store_true")
     parser.add_argument("--format",
                         help="output format - json, plain text, orgmode, archive (json + orgmode) - can appear multiple times",
-                        choices=['json', 'plain', 'orgmode', 'archive'],
+                        choices=['json', 'json-raw', 'plain', 'orgmode', 'archive'],
                         action="append")
     parser.set_defaults(func=get_data)
     subparsers = parser.add_subparsers(help="sub-command help")
