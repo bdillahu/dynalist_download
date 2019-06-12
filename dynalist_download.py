@@ -102,6 +102,7 @@ def get_data(args):
                 walk_tree(args, doc_list, child, level + 1)
         else:
             output(args, data, level)
+            # TODO - put call to get and print document contents here
             level -= 1
 
     # If no format specified, use plain
