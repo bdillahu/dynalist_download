@@ -21,12 +21,49 @@ Dynalist_add_url  = "https://dynalist.io/api/v1/inbox/add"
 body = {'token': bdillahuToken}  
 
 
-def parse_doc_list(raw_doc_list):
-    logger.info("called parse_doc_list")
 
-    doc_list = json.loads(raw_doc_list)
-    logger.info(f"Parsed doc_list: {doc_list}")
-    return doc_list
+    
+def output(args, raw_json, level):
+    # central output dispatcher
+    logger.info("called output")
+
+    def output_json(raw_json):
+        logger.info("called output_json")
+
+        print(raw_json)
+        
+
+    def output_plain(raw_json, level):
+        logger.info("called output_json")
+
+        print("    " * level, f"{raw_json['title']} - {raw_json['id']} - {raw_json['type']}")
+
+                    
+    def output_orgmode(raw_json, level):
+        logger.info("called output_orgmode")
+
+        print("*" * level, f"{raw_json['title']}")
+        print(":PROPERTIES:")
+        print(f":ID: {raw_json['id']}")
+        print(f":TYPE: {raw_json['type']}")
+        print(":END:")
+
+    def output_archive(raw_json, level):
+        # json + orgmode
+        logger.info("called output_archive")
+
+        output_json(raw_json)
+        output_orgmode(raw_json)
+
+    for format in args.format:
+        if format == 'json':
+            output_json(raw_json)
+        elif format == 'plain':
+            output_plain(raw_json, level)
+        elif format == 'orgmode':
+            output_orgmode(raw_json, level)
+        elif format == 'archive':
+            output_archive(raw_json, level)
 
 
 def get_data(args):
@@ -49,6 +86,23 @@ def get_data(args):
         logger.debug("RESPONSE: " + r.text)
         return r
 
+    def walk_tree(args, doc_list, folder_id, level):
+        logger.info("called walk_tree - recursive")
+
+        logger.info(f"tree root - {folder_id}")
+        data = next(item for item in doc_list['files'] if item['id'] == folder_id)
+        if data['type'] == 'folder':
+            output(args, data, level)
+            for child in data['children']:
+                walk_tree(args, doc_list, child, level + 1)
+        else:
+            output(args, data, level)
+            level -= 1
+
+    # If no format specified, use plain
+    if not args.format:
+        args.format = ['plain']
+    
     # Get list of all documents
     if args.list:
         raw_doc_list = list_docs()
@@ -61,19 +115,28 @@ def get_data(args):
             raw_file_contents = file_content(file_id)
             file_contents = json.loads(raw_file_contents.text)
             print(json.dumps(file_contents, indent=4))
-
+            
     # Dump everything
     if args.dump_all:
         raw_doc_list = list_docs()
         doc_list = json.loads(raw_doc_list.text)
-        print(f"Root File ID: {doc_list['root_file_id']}")
-        for file in doc_list['files']:
-            if file['type'] == 'folder':
-                print(f"    Folder: {file['id']} - {file['title']} - {file['type']}")
-                for child in file['children']:
-                    # https://stackoverflow.com/questions/8653516/python-list-of-dictionaries-search
-                    data = next(item for item in doc_list['files'] if item['id'] == child)
-                    print(f"        File: {data['id']} - {data['title']} - {datau['type']}")
+        logger.info(f"Root File ID: {doc_list['root_file_id']}")
+        if 'json' in args.format:
+            output(args, doc_list, 0)
+            args.format.remove('json')
+        if args.format:
+            # there are still other formats being requested
+            walk_tree(args, doc_list, doc_list['root_file_id'], 0)
+        
+#        for file in doc_list['files']:
+#            if file['type'] == 'folder':
+#                print(f"    Folder: {file['id']} - {file['title']} - {file['type']}")
+#                for child in file['children']:
+#                    # - https://stackoverflow.com/questions/8653516/python-list-of-dictionaries-search
+#                    data = next(item for item in doc_list['files'] if item['id'] == child)
+#                    print(f"        File: {data['id']} - {data['title']} - {data['type']}")
+
+
 #        for file_id in doc_list.files:
 #            file_contents = file_content(file_id)
 #            print(file_contents.text)
@@ -98,9 +161,22 @@ def get_parser():
     parser.add_argument("--dump-all", 
                         help="Dump contents of all documents",
                         action="store_true")
+    parser.add_argument("--format",
+                        help="output format - json, plain text, orgmode, archive (json + orgmode) - can appear multiple times",
+                        choices=['json', 'plain', 'orgmode', 'archive'],
+                        action="append")
     parser.set_defaults(func=get_data)
     subparsers = parser.add_subparsers(help="sub-command help")
 
+#    parser_new = subparsers.add_parser("format",
+#                                       help="output format - json, plain text, orgmode, archive (json + orgmode) - can appear multiple times",
+#                                       choices=['json', 'plain', 'orgmode', 'archive'],
+#                                       default='plain',
+#                                       const='plain',
+#                                       nargs='?',
+#                                       action="append")
+#    parser_new.set_defaults(func=get_data)
+    
     return parser
 
 
