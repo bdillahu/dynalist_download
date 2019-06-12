@@ -16,7 +16,7 @@ pipenv install requests
 ** To run a command in the environment
 
 #+BEGIN_SRC shell
-pipenv --three shell
+pipenv shell
 <command>
 #+END_SRC
 
@@ -28,3 +28,4 @@ without launching a shell
 pipenv run <command>
 #+END_SRC
 
+** Need to uninstall pudb3 from final, shipping enironment
