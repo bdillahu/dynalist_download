@@ -9,6 +9,9 @@ import json
 import argparse
 import requests
 
+
+# TODO - handle raw-json of documents better - instead of separate for each doc - but maybe that's right
+
 bdillahuToken = "xxxxxxxx"
 
 
@@ -43,15 +46,22 @@ def output_doc(args, raw_json, level):
             print("    " * level, f"{raw_json['title']}")
         if 'content' in raw_json:
             print("    " * level, f"{raw_json['content']}")
+            for key, value in raw_json.items():
+                print("    " * level, "- ", f"{key} = {value}")
+#            print("    " * level, json.dumps(raw_json, indent = level * 4, separators=(',', ': ')))
 
     def output_orgmode(raw_json, level):
         logger.info("called output_orgmode")
 
-        print("*" * level, f"{raw_json['title']}")
-        print(":PROPERTIES:")
-        print(f":ID: {raw_json['id']}")
-        print(f":TYPE: {raw_json['type']}")
-        print(":END:")
+        if 'title' in raw_json:
+            # I don't think this will ever happen
+            print("*" * level, f"{raw_json['title']}")
+        if 'content' in raw_json:
+            print("*" * level, f"{raw_json['content']}")
+            print(":PROPERTIES:")
+            for key, value in raw_json.items():
+                print(f":{key.upper()}: {value}")
+            print(":END:")
 
     def output_archive(raw_json, level):
         # json + orgmode
@@ -114,8 +124,13 @@ def output_file(args, raw_json, level):
 def get_data(args):
     logger.info("called get_data")
 
-    def list_docs():
-        logger.info("called list_docs")
+    # This is the main entry point of the program
+
+
+    
+    def list_files():
+        # get list of all files from API call
+        logger.info("called list_files")
 
         payload = {'token':bdillahuToken}
         logger.debug(f"POST: {Dynalist_list_url} {payload}")
@@ -137,18 +152,21 @@ def get_data(args):
 
         logger.info(f"tree root - {file_contents['title']} - {id}")
         # - https://stackoverflow.com/questions/8653516/python-list-of-dictionaries-search
-        data = next(item for item in file_contents['nodes'] if item['id'] == id)
-        #for node in file_contents['nodes']:
-        if 'children' in data:
-            output_doc(args, data, level)
-            for child in data['children']:
-                walk_doc_tree(args, file_contents, child, level + 1)
+        if 'nodes' in file_contents:
+            data = next(item for item in file_contents['nodes'] if item['id'] == id)
+            #for node in file_contents['nodes']:
+            if 'children' in data:
+                output_doc(args, data, level)
+                for child in data['children']:
+                    walk_doc_tree(args, file_contents, child, level + 1)
+            else:
+                output_doc(args, data, level)
+                level -= 1
         else:
-            output_doc(args, data, level)
-            level -= 1
+            output_doc(args, file_contents, level)
 
     def walk_file_tree(args, doc_list, id, level):
-        # the entire list of documents (files and folders)
+        # process the entire list of documents (files and folders)
         logger.info("called walk_file_tree - recursive")
 
         logger.info(f"tree root - {id}")
@@ -160,42 +178,50 @@ def get_data(args):
                 walk_file_tree(args, doc_list, child, level + 1)
         else:
             output_file(args, data, level)
-            # TODO - put call to get and print document contents here
+            if args.dump_all:
+                # call the API and get the details for this document
+                raw_file_contents = file_content(id)
+                file_contents = json.loads(raw_file_contents.text)
+                walk_doc_tree(args, file_contents, 'root', level)
             level -= 1
 
                     
-    # If no format specified, use plain
+    # If no output format specified, use plain
     if not args.format:
         args.format = ['plain']
     
     # Get list of all documents
 #    if args.list:
-#        raw_doc_list = list_docs()
+#        raw_doc_list = list_files()
 #        doc_list = json.loads(raw_doc_list.text)
 #        #print(json.dumps(doc_list, indent=4))
 #        output(args, doc_list, 0)
 
-    # Get contents of file(s) based on file_id received from the all-docs list
+    # Given a file_id (manually obtained or availalbe from the all-files list)
+    # retrieve contents of that file, walking the node tree
     if args.file:
         for file_id in args.file:
             raw_file_contents = file_content(file_id)
             file_contents = json.loads(raw_file_contents.text)
             walk_doc_tree(args, file_contents, 'root', 0)
-#            print(json.dumps(file_contents, indent=4))
-            
-    raw_doc_list = list_docs()
-    doc_list = json.loads(raw_doc_list.text)
-    logger.info(f"Root File ID: {doc_list['root_file_id']}")
-    #if any(item in args.format for item in ['json', 'json-raw']):
-    if 'json' in args.format:
-        output_file(args, doc_list, 0)
-        args.format.remove('json')
-    elif 'json-raw' in args.format:
-        output_file(args, doc_list, 0)
-        args.format.remove('json-raw')
-    if args.format:
-        # there are still other formats being requested
-        walk_file_tree(args, doc_list, doc_list['root_file_id'], 0)
+    else:
+        # anything else --list or --dump_all
+
+        # get list of files
+        raw_doc_list = list_files()
+        doc_list = json.loads(raw_doc_list.text)
+        logger.info(f"Root File ID: {doc_list['root_file_id']}")
+
+        #if any(item in args.format for item in ['json', 'json-raw']):
+        if 'json' in args.format:
+            output_file(args, doc_list, 0)
+            args.format.remove('json')
+        elif 'json-raw' in args.format:
+            output_file(args, doc_list, 0)
+            args.format.remove('json-raw')
+        if args.format:
+            # there are still other formats being requested
+            walk_file_tree(args, doc_list, doc_list['root_file_id'], 0)
 
             
 #        for file in doc_list['files']:
@@ -228,7 +254,7 @@ def get_parser():
     parser.add_argument("--file",
                         help="Download contents of file - can appear multiple times",
                         action="append")
-    parser.add_argument("--dump-all", 
+    parser.add_argument("--dump_all", 
                         help="Dump contents of all documents",
                         action="store_true")
     parser.add_argument("--format",
@@ -272,6 +298,8 @@ if __name__ == "__main__":
     logging.basicConfig(filename='dynalist_download.log', format='%(levelname)s:%(filename)s:%(module)s:%(message)s', level=logging.INFO)
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
-    
+
+    # Create a parser for command line interface
+    # Program flow will hit get_data() as the main entry point
     parser = get_parser()
     run_parser(parser)
