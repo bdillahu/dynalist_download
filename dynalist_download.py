@@ -21,27 +21,67 @@ Dynalist_add_url  = "https://dynalist.io/api/v1/inbox/add"
 body = {'token': bdillahuToken}  
 
 
+def output_json_raw(raw_json):
+    logger.info("called output_json")
 
-    
-def output(args, raw_json, level):
+    print(raw_json)
+
+def output_json_pretty(raw_json):
+    logger.info("called output_json")
+    print(json.dumps(raw_json, indent=4))        
+
+
+def output_doc(args, raw_json, level):
     # central output dispatcher
-    logger.info("called output")
+    logger.info("called output_doc")
 
-    def output_json_raw(raw_json):
+    def output_plain(raw_json, level):
         logger.info("called output_json")
 
-        print(raw_json)
+        if 'title' in raw_json:
+            # I don't think this will ever happen
+            print("    " * level, f"{raw_json['title']}")
+        if 'content' in raw_json:
+            print("    " * level, f"{raw_json['content']}")
 
-    def output_json_pretty(raw_json):
-        logger.info("called output_json")
-        print(json.dumps(raw_json, indent=4))        
+    def output_orgmode(raw_json, level):
+        logger.info("called output_orgmode")
+
+        print("*" * level, f"{raw_json['title']}")
+        print(":PROPERTIES:")
+        print(f":ID: {raw_json['id']}")
+        print(f":TYPE: {raw_json['type']}")
+        print(":END:")
+
+    def output_archive(raw_json, level):
+        # json + orgmode
+        logger.info("called output_archive")
+
+        output_json(raw_json)
+        output_orgmode(raw_json)
+
+    for format in args.format:
+        if format == 'json':
+            output_json_pretty(raw_json)
+        elif format == 'json-raw':
+            output_json_raw(raw_json)
+        elif format == 'plain':
+            output_plain(raw_json, level)
+        elif format == 'orgmode':
+            output_orgmode(raw_json, level)
+        elif format == 'archive':
+            output_archive(raw_json, level)
+
+
+def output_file(args, raw_json, level):
+    # central output dispatcher
+    logger.info("called output_file")
 
     def output_plain(raw_json, level):
         logger.info("called output_json")
 
         print("    " * level, f"{raw_json['title']} - {raw_json['id']} - {raw_json['type']}")
 
-                    
     def output_orgmode(raw_json, level):
         logger.info("called output_orgmode")
 
@@ -91,53 +131,71 @@ def get_data(args):
         logger.debug("RESPONSE: " + r.text)
         return r
 
-    def walk_tree(args, doc_list, folder_id, level):
-        logger.info("called walk_tree - recursive")
+    def walk_doc_tree(args, file_contents, id, level):
+        # an individual document (outline)
+        logger.info("called walk_doc_tree - recursive")
 
-        logger.info(f"tree root - {folder_id}")
-        data = next(item for item in doc_list['files'] if item['id'] == folder_id)
-        if data['type'] == 'folder':
-            output(args, data, level)
+        logger.info(f"tree root - {file_contents['title']} - {id}")
+        # - https://stackoverflow.com/questions/8653516/python-list-of-dictionaries-search
+        data = next(item for item in file_contents['nodes'] if item['id'] == id)
+        #for node in file_contents['nodes']:
+        if 'children' in data:
+            output_doc(args, data, level)
             for child in data['children']:
-                walk_tree(args, doc_list, child, level + 1)
+                walk_doc_tree(args, file_contents, child, level + 1)
         else:
-            output(args, data, level)
+            output_doc(args, data, level)
+            level -= 1
+
+    def walk_file_tree(args, doc_list, id, level):
+        # the entire list of documents (files and folders)
+        logger.info("called walk_file_tree - recursive")
+
+        logger.info(f"tree root - {id}")
+        # - https://stackoverflow.com/questions/8653516/python-list-of-dictionaries-search
+        data = next(item for item in doc_list['files'] if item['id'] == id)
+        if data['type'] == 'folder':
+            output_file(args, data, level)
+            for child in data['children']:
+                walk_file_tree(args, doc_list, child, level + 1)
+        else:
+            output_file(args, data, level)
             # TODO - put call to get and print document contents here
             level -= 1
 
+                    
     # If no format specified, use plain
     if not args.format:
         args.format = ['plain']
     
     # Get list of all documents
-    if args.list:
-        raw_doc_list = list_docs()
-        doc_list = json.loads(raw_doc_list.text)
-        #print(json.dumps(doc_list, indent=4))
-        output(args, doc_list, 0)
+#    if args.list:
+#        raw_doc_list = list_docs()
+#        doc_list = json.loads(raw_doc_list.text)
+#        #print(json.dumps(doc_list, indent=4))
+#        output(args, doc_list, 0)
 
     # Get contents of file(s) based on file_id received from the all-docs list
     if args.file:
         for file_id in args.file:
             raw_file_contents = file_content(file_id)
             file_contents = json.loads(raw_file_contents.text)
-            print(json.dumps(file_contents, indent=4))
+            walk_doc_tree(args, file_contents, 'root', 0)
+#            print(json.dumps(file_contents, indent=4))
             
-    # Dump everything
-    if args.dump_all:
-        raw_doc_list = list_docs()
-        doc_list = json.loads(raw_doc_list.text)
-        logger.info(f"Root File ID: {doc_list['root_file_id']}")
-        #if any(item in args.format for item in ['json', 'json-raw']):
-        if 'json' in args.format:
-            output(args, doc_list, 0)
-            args.format.remove('json')
-        elif 'json-raw' in args.format:
-            output(args, doc_list, 0)
-            args.format.remove('json-raw')
-        if args.format:
-            # there are still other formats being requested
-            walk_tree(args, doc_list, doc_list['root_file_id'], 0)
+    raw_doc_list = list_docs()
+    doc_list = json.loads(raw_doc_list.text)
+    logger.info(f"Root File ID: {doc_list['root_file_id']}")
+    #if any(item in args.format for item in ['json', 'json-raw']):
+    if 'json' in args.format:
+        output_file(args, doc_list, 0)
+        args.format.remove('json')
+    elif 'json-raw' in args.format:
+        output_file(args, doc_list, 0)
+        args.format.remove('json-raw')
+    if args.format:
+        # there are still other formats being requested
+        walk_file_tree(args, doc_list, doc_list['root_file_id'], 0)
 
             
 #        for file in doc_list['files']:
