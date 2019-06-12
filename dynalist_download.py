@@ -8,7 +8,8 @@ import urllib.request
 import json
 import argparse
 import requests
-
+from datetime import datetime
+import re
 
 # TODO - handle raw-json of documents better - instead of separate for each doc - but maybe that's right
 
@@ -33,9 +34,37 @@ def output_json_pretty(raw_json):
     logger.info("called output_json")
     print(json.dumps(raw_json, indent=4))        
 
+def convert_date(timestamp):
+    logger.debug(f"called convert_date - {timestamp}")
+
+    # - https://stackoverflow.com/questions/3682748/converting-unix-timestamp-string-to-readable-date
+    # if you encounter a "year is out of range" error the timestamp
+    # may be in milliseconds, try `ts /= 1000` in that case
+    if timestamp == 0:
+        # empty or unknown
+        return 'unknown'
+    else:
+        timestamp /= 1000
+        return (datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S'))
+
+def convert_links_to_org(string):
+    logger.debug(f"called convert_link_to_org - {string}")
+
+    # is it really a string, or a list of something
+    if isinstance(string, str):
+        search = r'(\[.*\])\((.*)\)'
+        replace = r'[[\2]\1]'
+        string = re.sub(search, replace, string)
+        logger.debug(f"converted link - {string}")
+        return string
+    else:
+        # should never happen
+        logger.error(f"called convert_link_to_org on NON-STRING - {string}")
+        return f"NON-STRING - {string}"
+    
 
 def output_doc(args, raw_json, level):
-    # central output dispatcher
+    # central output dispatcher for documents and their nodes
     logger.info("called output_doc")
 
     def output_plain(raw_json, level):
@@ -47,6 +76,8 @@ def output_doc(args, raw_json, level):
         if 'content' in raw_json:
             print("    " * level, f"{raw_json['content']}")
             for key, value in raw_json.items():
+                if (key == 'created') or (key == 'modified'):
+                    value = convert_date(value)
                 print("    " * level, "- ", f"{key} = {value}")
 #            print("    " * level, json.dumps(raw_json, indent = level * 4, separators=(',', ': ')))
 
@@ -57,9 +88,13 @@ def output_doc(args, raw_json, level):
             # I don't think this will ever happen
             print("*" * level, f"{raw_json['title']}")
         if 'content' in raw_json:
-            print("*" * level, f"{raw_json['content']}")
+            content = raw_json['content']
+            content = convert_links_to_org(content)
+            print("*" * level, f"{content}")
             print(":PROPERTIES:")
             for key, value in raw_json.items():
+                if (key == 'note') or (key == 'content'):
+                    value = convert_links_to_org(value)
                 print(f":{key.upper()}: {value}")
             print(":END:")
 
@@ -84,7 +119,7 @@ def output_doc(args, raw_json, level):
 
 
 def output_file(args, raw_json, level):
-    # central output dispatcher
+    # central output dispatcher for file list
     logger.info("called output_file")
 
     def output_plain(raw_json, level):
