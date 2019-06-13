@@ -15,7 +15,6 @@ import shutil
 
 # TODO - implement a "with Archive" and "without Archive" flag - don't do the Archive tree if "without Archive"
 #        Then you can do the Archive once a day and the rest more often
-# TODO - finish Org-mode tag processing
 # TODO - implement a markdown output format - similar to orgmode with repeated '#' for headlines and YAML style metadata blocks
 # TODO - hardcode output filename for list (?)
 
@@ -89,11 +88,35 @@ def convert_links_to_org(string):
 def convert_tags_to_org(string):
     logger.debug(f"called convert_tags_to_org - {string}")
 
+    # Only implemented in headline
+    # since tags my be inline with text in Dynalist, this may not make sense
+    # and definitely doesn't in the note field in my opinion
+
+    # - https://stackoverflow.com/questions/16440267/how-to-find-a-word-that-starts-with-a-specific-character
+    # - https://stackoverflow.com/questions/20282452/regex-to-match-word-beginning-with
+    # not the lower case \b is a word boundary and the Upper \B is non-word - I think
+
     # is it really a string, or a list of something
     if isinstance(string, str):
         search = r'(\[.*\])\((.*)\)'
         replace = r'[[\2]\1]'
-        string = re.sub(search, replace, string)
+        tags = re.findall(r'\B[#@]\w+', string)
+        
+        if tags:
+            # pull the tags out of the string
+            for tag in tags:
+                string = string.replace(f" {tag}", '')
+
+            # remove # and @ from tag list
+            # this will actually remove both a leading and trailing @ or #
+            # tags = ([s.strip('@#') for s in tags])
+            # this version will only remove a leading character, but doesn't matter what it is
+            tags = ([s[1:] for s in tags])
+
+            # append the new org style tags
+            tagstring = ':'.join(tags)
+            string = f"{string}      :{tagstring}:"
+                
         logger.debug(f"converted tag - {string}")
         return string
     else:
@@ -166,6 +189,7 @@ def output_doc(args, raw_json, level, path):
         if 'content' in raw_json:
             content = raw_json['content']
             content = convert_links_to_org(content)
+            content = convert_tags_to_org(content)
             write_out(args, "*" * level + f" {content}", path)
             write_out(args, ":PROPERTIES:", path)
             for key, value in raw_json.items():
