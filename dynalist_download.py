@@ -19,6 +19,7 @@ import shutil
 # TODO - implement a markdown output format - similar to orgmode with repeated '#' for headlines and YAML style metadata blocks
 # TODO - hardcode output filename for list (?)
 
+
 bdillahuToken = "xxxxxxxx"
 
 
@@ -67,7 +68,8 @@ def convert_date(timestamp):
         return 'unknown'
     else:
         timestamp /= 1000
-        return (datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S'))
+#        return (datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S'))
+        return (datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S %a'))
 
 def convert_links_to_org(string):
     logger.debug(f"called convert_link_to_org - {string}")
