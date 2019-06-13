@@ -13,9 +13,11 @@ import re
 import os
 import shutil
 
-# TODO - handle raw-json of documents better - instead of separate for each doc - but maybe that's right
 # TODO - implement a "with Archive" and "without Archive" flag - don't do the Archive tree if "without Archive"
 #        Then you can do the Archive once a day and the rest more often
+# TODO - finish Org-mode tag processing
+# TODO - implement a markdown output format - similar to orgmode with repeated '#' for headlines and YAML style metadata blocks
+# TODO - hardcode output filename for list (?)
 
 bdillahuToken = "xxxxxxxx"
 
@@ -30,15 +32,26 @@ body = {'token': bdillahuToken}
 root_path = "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive"
 text_extension = ".txt"
 org_extension  = ".org"
+json_extension = ".json"
 
-def output_json_raw(raw_json):
+def output_json(args, raw_json):
     logger.info("called output_json")
 
-    print(raw_json)
+    if 'json' in args.format:
+        if args.output_path:
+            f=open(os.path.join(args.output_path, f"json_pretty{json_extension}"), "a+")
+            json.dump(f, raw_json, indent=4)
+            f.close()
+        else:    
+            print(json.dumps(raw_json, indent=4))        
+    if 'json-raw' in args.format:
+        if args.output_path:
+            f=open(os.path.join(args.output_path, f"json_raw{json_extension}"), "a+")
+            f.write(f"{raw_json}\n")
+            f.close()
+        else:    
+            print(raw_json)
 
-def output_json_pretty(raw_json):
-    logger.info("called output_json")
-    print(json.dumps(raw_json, indent=4))        
 
 def convert_date(timestamp):
     logger.debug(f"called convert_date - {timestamp}")
@@ -68,6 +81,21 @@ def convert_links_to_org(string):
         logger.error(f"called convert_link_to_org on NON-STRING - {string}")
         return f"NON-STRING - {string}"
 
+def convert_tags_to_org(string):
+    logger.debug(f"called convert_tags_to_org - {string}")
+
+    # is it really a string, or a list of something
+    if isinstance(string, str):
+        search = r'(\[.*\])\((.*)\)'
+        replace = r'[[\2]\1]'
+        string = re.sub(search, replace, string)
+        logger.debug(f"converted tag - {string}")
+        return string
+    else:
+        # should never happen
+        logger.error(f"called convert_tags_to_org on NON-STRING - {string}")
+    
+    
 def add_folder(args, path):
     logger.debug(f"called write_out - {path}")
 
@@ -89,11 +117,12 @@ def write_out(args, string, path=None):
     if not path is None:
         if args.output_path:
             f=open(os.path.join(args.output_path, path), "a+")
-            f.write(f"{string} \n")
+            f.write(f"{string}\n")
             f.close()
         else:    
             print(string)
-                
+
+            
 
 def git_commit(args):
     logger.debug(f"called git_commit")
@@ -117,7 +146,8 @@ def output_doc(args, raw_json, level, path):
             for key, value in raw_json.items():
                 if (key == 'created') or (key == 'modified'):
                     value = convert_date(value)
-                write_out(args, "    " * level + f"- {key} = {value}", path)
+                write_out(args, "    " * level + f"  - {key} = {value}", path)
+            write_out(args, " \n", path)
 #            print("    " * level, json.dumps(raw_json, indent = level * 4, separators=(',', ': ')))
 
     def output_orgmode(raw_json, level, path):
@@ -127,17 +157,21 @@ def output_doc(args, raw_json, level, path):
         
         if 'title' in raw_json:
             # I don't think this will ever happen
-            write_out(args, "*" * level + f"{raw_json['title']}", path)
+            write_out(args, "*" * level + f" {raw_json['title']}", path)
         if 'content' in raw_json:
             content = raw_json['content']
             content = convert_links_to_org(content)
-            write_out(args, "*" * level + f"{content}", path)
+            write_out(args, "*" * level + f" {content}", path)
             write_out(args, ":PROPERTIES:", path)
             for key, value in raw_json.items():
                 if (key == 'note') or (key == 'content'):
                     value = convert_links_to_org(value)
-                write_out(args, f":{key.upper()}: {value}", path)
+                if not (key == 'note'):
+                    write_out(args, f":{key.upper()}: {value}", path)
             write_out(args, ":END:", path)
+
+            # write the note at the end of the properties drawer
+            write_out(args, raw_json['note'], path)
 
     def output_archive(raw_json, level):
         # json + orgmode
@@ -147,11 +181,11 @@ def output_doc(args, raw_json, level, path):
         output_orgmode(raw_json)
 
     for format in args.format:
-        if format == 'json':
-            output_json_pretty(raw_json)
-        elif format == 'json-raw':
-            output_json_raw(raw_json)
-        elif format == 'plain':
+#        if format == 'json':
+#            output_json_pretty(args, raw_json)
+#        elif format == 'json-raw':
+#            output_json_raw(args, raw_json)
+        if format == 'plain':
             output_plain(raw_json, level, path)
         elif format == 'orgmode':
             output_orgmode(raw_json, level, path)
@@ -171,7 +205,7 @@ def output_file(args, raw_json, level, path):
     def output_orgmode(raw_json, level, path):
         logger.info("called output_orgmode")
 
-        write_out(args, "*" * level + f"{raw_json['title']}")
+        write_out(args, "*" * level + f" {raw_json['title']}")
         write_out(args, ":PROPERTIES:")
         write_out(args, f":ID: {raw_json['id']}")
         write_out(args, f":TYPE: {raw_json['type']}")
@@ -185,11 +219,11 @@ def output_file(args, raw_json, level, path):
         output_orgmode(raw_json)
 
     for format in args.format:
-        if format == 'json':
-            output_json_pretty(raw_json)
-        elif format == 'json-raw':
-            output_json_raw(raw_json)
-        elif format == 'plain':
+#        if format == 'json':
+#            output_json_pretty(args, raw_json)
+#        elif format == 'json-raw':
+#            output_json_raw(args, raw_json)
+        if format == 'plain':
             output_plain(raw_json, level, path)
         elif format == 'orgmode':
             output_orgmode(raw_json, level, path)
@@ -222,6 +256,18 @@ def get_data(args):
         logger.debug("RESPONSE: " + r.text)
         return r
 
+    def process_doc(file_id):
+        logger.debug(f"called process_doc - {file_id}")
+        raw_file_contents = file_content(file_id)
+        file_contents = json.loads(raw_file_contents.text)
+        if ('json' in args.format) or ('json-raw' in args.format):
+            output_json(args, file_contents)
+        else:
+            if args.output_path:
+                path = os.path.join(path, file_contents['title'])
+            output_doc(args, file_contents, 0, path)
+
+
     def walk_doc_tree(args, file_contents, id, level, path):
         # an individual document (outline)
         logger.info("called walk_doc_tree - recursive")
@@ -229,8 +275,10 @@ def get_data(args):
         logger.info(f"tree root - {file_contents['title']} - {id}")
         if 'nodes' in file_contents:
             data = next(item for item in file_contents['nodes'] if item['id'] == id)
+                
             #for node in file_contents['nodes']:
             if 'children' in data:
+                output_doc(args, data, level, path)
                 for child in data['children']:
                     walk_doc_tree(args, file_contents, child, level + 1, path)
             else:
@@ -260,10 +308,15 @@ def get_data(args):
                 # call the API and get the details for this document
                 raw_file_contents = file_content(id)
                 file_contents = json.loads(raw_file_contents.text)
+                if ('json' in args.format) or ('json-raw' in args.format):
+                    output_json(args, raw_file_contents.text)
+
                 if args.output_path:
                     path = os.path.join(path, file_contents['title'])
                 walk_doc_tree(args, file_contents, 'root', level, path)
             level -= 1
+
+        
 
                     
     # If no output format specified, use plain
@@ -288,6 +341,7 @@ def get_data(args):
                 shutil.rmtree(filepath)
             else:
                 os.remove(filepath)
+                
     
     # Get list of all documents
 #    if args.list:
@@ -300,8 +354,16 @@ def get_data(args):
     # retrieve contents of that file, walking the node tree
     if args.file:
         for file_id in args.file:
+            # call the API and get the details for this document
             raw_file_contents = file_content(file_id)
             file_contents = json.loads(raw_file_contents.text)
+            if ('json' in args.format) or ('json-raw' in args.format):
+                output_json(args, file_contents)
+
+            if args.output_path:
+                path = os.path.join(path, file_contents['title'])
+            else:
+                path = args.output_path
             walk_doc_tree(args, file_contents, 'root', 0, path)
     else:
         # anything else --list or --dump_all
@@ -313,15 +375,14 @@ def get_data(args):
 
         #if any(item in args.format for item in ['json', 'json-raw']):
         if 'json' in args.format:
-            output_file(args, doc_list, 0)
-            args.format.remove('json')
+            output_json(args, doc_list)
+#            args.format.remove('json')
         elif 'json-raw' in args.format:
-            output_file(args, doc_list, 0)
-            args.format.remove('json-raw')
+            output_json(args, doc_list)
+#            args.format.remove('json-raw')
         if args.format:
             # there are still other formats being requested
-            path = args.output_path
-            walk_file_tree(args, doc_list, doc_list['root_file_id'], 0, path)
+            walk_file_tree(args, doc_list, doc_list['root_file_id'], 0, args.output_path)
 
             
 #        for file in doc_list['files']:
