@@ -32,7 +32,10 @@ body = {'token': bdillahuToken}
 root_path = "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive"
 text_extension = ".txt"
 org_extension  = ".org"
+json_raw_filename = "json_raw"
+json_pretty_filename = "json_pretty"
 json_extension = ".json"
+list_filename  = "dynalist_list"
 
 def output_json(args, raw_json):
     logger.info("called output_json")
@@ -41,14 +44,14 @@ def output_json(args, raw_json):
         raw_json = json.loads(raw_json)
     if 'json' in args.format:
         if args.output_path:
-            f=open(os.path.join(args.output_path, f"json_pretty{json_extension}"), "a+")
+            f=open(os.path.join(args.output_path, f"{json_pretty_filename}{json_extension}"), "a+")
             f.write(json.dumps(raw_json, indent=4))
             f.close()
         else:    
             print(json.dumps(raw_json, indent=4))        
     if 'json-raw' in args.format:
         if args.output_path:
-            f=open(os.path.join(args.output_path, f"json_raw{json_extension}"), "a+")
+            f=open(os.path.join(args.output_path, f"{json_raw_filename}{json_extension}"), "a+")
             json.dump(raw_json, f)
 #            f.write(f"{raw_json}\n")
             f.close()
