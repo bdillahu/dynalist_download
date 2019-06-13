@@ -11,6 +11,7 @@ import requests
 from datetime import datetime
 import re
 import os
+import shutil
 
 # TODO - handle raw-json of documents better - instead of separate for each doc - but maybe that's right
 # TODO - implement a "with Archive" and "without Archive" flag - don't do the Archive tree if "without Archive"
@@ -27,6 +28,8 @@ Dynalist_add_url  = "https://dynalist.io/api/v1/inbox/add"
 # Constants
 body = {'token': bdillahuToken}
 root_path = "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive"
+text_extension = ".txt"
+org_extension  = ".org"
 
 def output_json_raw(raw_json):
     logger.info("called output_json")
@@ -92,7 +95,10 @@ def write_out(args, string, path=None):
             print(string)
                 
 
+def git_commit(args):
+    logger.debug(f"called git_commit")
 
+    
         
 def output_doc(args, raw_json, level, path):
     # central output dispatcher for documents and their nodes
@@ -100,6 +106,8 @@ def output_doc(args, raw_json, level, path):
 
     def output_plain(raw_json, level, path):
         logger.info("called output_json")
+
+        path = f"{path}{text_extension}"
 
         if 'title' in raw_json:
             # I don't think this will ever happen
@@ -115,7 +123,7 @@ def output_doc(args, raw_json, level, path):
     def output_orgmode(raw_json, level, path):
         logger.info("called output_orgmode")
 
-        path = f"{path}.org"
+        path = f"{path}{org_extension}"
         
         if 'title' in raw_json:
             # I don't think this will ever happen
@@ -261,6 +269,25 @@ def get_data(args):
     # If no output format specified, use plain
     if not args.format:
         args.format = ['plain']
+
+    # If output to files, clean out existing directory
+    if args.output_path:
+        logger.debug(f"Removing all contents - {args.output_path}/*")
+
+        # I don't just blow away everything because I wand .git to stay
+        
+        # Get list of all files and directories
+        filelist = os.listdir(args.output_path)
+
+        # Remove .git from list
+        filelist.remove('.git')
+
+        for file in filelist:
+            filepath = os.path.join(args.output_path, file)
+            if os.path.isdir(filepath):
+                shutil.rmtree(filepath)
+            else:
+                os.remove(filepath)
     
     # Get list of all documents
 #    if args.list:
@@ -328,7 +355,7 @@ def get_parser():
                         help="Download contents of file - can appear multiple times",
                         action="append")
     parser.add_argument("--output_path",
-                        help="if directory given, output goes to that location instead of stdout",
+                        help="if directory given, output goes to that location instead of stdout - EXISTING CONTENTS WILL BE DELETED",
                         action="store")
     parser.add_argument("--dump_all", 
                         help="Dump contents of all documents",
