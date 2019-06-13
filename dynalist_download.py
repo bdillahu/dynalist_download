@@ -10,8 +10,11 @@ import argparse
 import requests
 from datetime import datetime
 import re
+import os
 
 # TODO - handle raw-json of documents better - instead of separate for each doc - but maybe that's right
+# TODO - implement a "with Archive" and "without Archive" flag - don't do the Archive tree if "without Archive"
+#        Then you can do the Archive once a day and the rest more often
 
 bdillahuToken = "xxxxxxxx"
 
@@ -21,9 +24,9 @@ Dynalist_edit_url = "https://dynalist.io/api/v1/file/edit"
 Dynalist_read_url = "https://dynalist.io/api/v1/doc/read"
 Dynalist_add_url  = "https://dynalist.io/api/v1/inbox/add"
 
-
-body = {'token': bdillahuToken}  
-
+# Constants
+body = {'token': bdillahuToken}
+root_path = "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive"
 
 def output_json_raw(raw_json):
     logger.info("called output_json")
@@ -61,42 +64,72 @@ def convert_links_to_org(string):
         # should never happen
         logger.error(f"called convert_link_to_org on NON-STRING - {string}")
         return f"NON-STRING - {string}"
-    
 
-def output_doc(args, raw_json, level):
+def add_folder(args, path):
+    logger.debug(f"called write_out - {path}")
+
+    if args.output_path:
+        # TODO - add some error checking - try statement
+        logger.debug(f"creating directory - {path}")
+        if not os.path.exists(path):
+            os.mkdir(path)
+        else:
+            if not os.path.isdir(path):
+                logger.error(f"FILE IN THE WAY! - {path}")
+        
+               
+def write_out(args, string, path=None):
+    logger.debug(f"called write_out - {string}")
+    # write to stdout unless an output directory is given
+
+#    print(string)
+    if not path is None:
+        if args.output_path:
+            f=open(os.path.join(args.output_path, path), "a+")
+            f.write(f"{string} \n")
+            f.close()
+        else:    
+            print(string)
+                
+
+
+        
+def output_doc(args, raw_json, level, path):
     # central output dispatcher for documents and their nodes
     logger.info("called output_doc")
 
-    def output_plain(raw_json, level):
+    def output_plain(raw_json, level, path):
         logger.info("called output_json")
 
         if 'title' in raw_json:
             # I don't think this will ever happen
-            print("    " * level, f"{raw_json['title']}")
+            write_out(args, "    " * level + f"{raw_json['title']}", path)
         if 'content' in raw_json:
-            print("    " * level, f"{raw_json['content']}")
+            write_out(args, "    " * level + f"{raw_json['content']}", path)
             for key, value in raw_json.items():
                 if (key == 'created') or (key == 'modified'):
                     value = convert_date(value)
-                print("    " * level, "- ", f"{key} = {value}")
+                write_out(args, "    " * level + f"- {key} = {value}", path)
 #            print("    " * level, json.dumps(raw_json, indent = level * 4, separators=(',', ': ')))
 
-    def output_orgmode(raw_json, level):
+    def output_orgmode(raw_json, level, path):
         logger.info("called output_orgmode")
 
+        path = f"{path}.org"
+        
         if 'title' in raw_json:
             # I don't think this will ever happen
-            print("*" * level, f"{raw_json['title']}")
+            write_out(args, "*" * level + f"{raw_json['title']}", path)
         if 'content' in raw_json:
             content = raw_json['content']
             content = convert_links_to_org(content)
-            print("*" * level, f"{content}")
-            print(":PROPERTIES:")
+            write_out(args, "*" * level + f"{content}", path)
+            write_out(args, ":PROPERTIES:", path)
             for key, value in raw_json.items():
                 if (key == 'note') or (key == 'content'):
                     value = convert_links_to_org(value)
-                print(f":{key.upper()}: {value}")
-            print(":END:")
+                write_out(args, f":{key.upper()}: {value}", path)
+            write_out(args, ":END:", path)
 
     def output_archive(raw_json, level):
         # json + orgmode
@@ -111,30 +144,30 @@ def output_doc(args, raw_json, level):
         elif format == 'json-raw':
             output_json_raw(raw_json)
         elif format == 'plain':
-            output_plain(raw_json, level)
+            output_plain(raw_json, level, path)
         elif format == 'orgmode':
-            output_orgmode(raw_json, level)
+            output_orgmode(raw_json, level, path)
         elif format == 'archive':
             output_archive(raw_json, level)
 
 
-def output_file(args, raw_json, level):
+def output_file(args, raw_json, level, path):
     # central output dispatcher for file list
     logger.info("called output_file")
 
-    def output_plain(raw_json, level):
+    def output_plain(raw_json, level, path):
         logger.info("called output_json")
 
-        print("    " * level, f"{raw_json['title']} - {raw_json['id']} - {raw_json['type']}")
+        write_out(args, "    " * level + f"{raw_json['title']} - {raw_json['id']} - {raw_json['type']}")
 
-    def output_orgmode(raw_json, level):
+    def output_orgmode(raw_json, level, path):
         logger.info("called output_orgmode")
 
-        print("*" * level, f"{raw_json['title']}")
-        print(":PROPERTIES:")
-        print(f":ID: {raw_json['id']}")
-        print(f":TYPE: {raw_json['type']}")
-        print(":END:")
+        write_out(args, "*" * level + f"{raw_json['title']}")
+        write_out(args, ":PROPERTIES:")
+        write_out(args, f":ID: {raw_json['id']}")
+        write_out(args, f":TYPE: {raw_json['type']}")
+        write_out(args, ":END:")
 
     def output_archive(raw_json, level):
         # json + orgmode
@@ -149,9 +182,9 @@ def output_file(args, raw_json, level):
         elif format == 'json-raw':
             output_json_raw(raw_json)
         elif format == 'plain':
-            output_plain(raw_json, level)
+            output_plain(raw_json, level, path)
         elif format == 'orgmode':
-            output_orgmode(raw_json, level)
+            output_orgmode(raw_json, level, path)
         elif format == 'archive':
             output_archive(raw_json, level)
 
@@ -181,26 +214,24 @@ def get_data(args):
         logger.debug("RESPONSE: " + r.text)
         return r
 
-    def walk_doc_tree(args, file_contents, id, level):
+    def walk_doc_tree(args, file_contents, id, level, path):
         # an individual document (outline)
         logger.info("called walk_doc_tree - recursive")
 
         logger.info(f"tree root - {file_contents['title']} - {id}")
-        # - https://stackoverflow.com/questions/8653516/python-list-of-dictionaries-search
         if 'nodes' in file_contents:
             data = next(item for item in file_contents['nodes'] if item['id'] == id)
             #for node in file_contents['nodes']:
             if 'children' in data:
-                output_doc(args, data, level)
                 for child in data['children']:
-                    walk_doc_tree(args, file_contents, child, level + 1)
+                    walk_doc_tree(args, file_contents, child, level + 1, path)
             else:
-                output_doc(args, data, level)
+                output_doc(args, data, level, path)
                 level -= 1
         else:
-            output_doc(args, file_contents, level)
+            output_doc(args, file_contents, level, path)
 
-    def walk_file_tree(args, doc_list, id, level):
+    def walk_file_tree(args, doc_list, id, level, path):
         # process the entire list of documents (files and folders)
         logger.info("called walk_file_tree - recursive")
 
@@ -208,16 +239,22 @@ def get_data(args):
         # - https://stackoverflow.com/questions/8653516/python-list-of-dictionaries-search
         data = next(item for item in doc_list['files'] if item['id'] == id)
         if data['type'] == 'folder':
-            output_file(args, data, level)
+            output_file(args, data, level, path)
+            if args.output_path:
+                if not data['title'] == 'Untitled':
+                    path = os.path.join(path, data['title'])
+                    add_folder(args, path)
             for child in data['children']:
-                walk_file_tree(args, doc_list, child, level + 1)
+                walk_file_tree(args, doc_list, child, level + 1, path)
         else:
-            output_file(args, data, level)
+            output_file(args, data, level, path)
             if args.dump_all:
                 # call the API and get the details for this document
                 raw_file_contents = file_content(id)
                 file_contents = json.loads(raw_file_contents.text)
-                walk_doc_tree(args, file_contents, 'root', level)
+                if args.output_path:
+                    path = os.path.join(path, file_contents['title'])
+                walk_doc_tree(args, file_contents, 'root', level, path)
             level -= 1
 
                     
@@ -238,7 +275,7 @@ def get_data(args):
         for file_id in args.file:
             raw_file_contents = file_content(file_id)
             file_contents = json.loads(raw_file_contents.text)
-            walk_doc_tree(args, file_contents, 'root', 0)
+            walk_doc_tree(args, file_contents, 'root', 0, path)
     else:
         # anything else --list or --dump_all
 
@@ -256,7 +293,8 @@ def get_data(args):
             args.format.remove('json-raw')
         if args.format:
             # there are still other formats being requested
-            walk_file_tree(args, doc_list, doc_list['root_file_id'], 0)
+            path = args.output_path
+            walk_file_tree(args, doc_list, doc_list['root_file_id'], 0, path)
 
             
 #        for file in doc_list['files']:
@@ -289,6 +327,9 @@ def get_parser():
     parser.add_argument("--file",
                         help="Download contents of file - can appear multiple times",
                         action="append")
+    parser.add_argument("--output_path",
+                        help="if directory given, output goes to that location instead of stdout",
+                        action="store")
     parser.add_argument("--dump_all", 
                         help="Dump contents of all documents",
                         action="store_true")
@@ -297,7 +338,7 @@ def get_parser():
                         choices=['json', 'json-raw', 'plain', 'orgmode', 'archive'],
                         action="append")
     parser.set_defaults(func=get_data)
-    subparsers = parser.add_subparsers(help="sub-command help")
+#    subparsers = parser.add_subparsers(help="sub-command help")
 
 #    parser_new = subparsers.add_parser("format",
 #                                       help="output format - json, plain text, orgmode, archive (json + orgmode) - can appear multiple times",
