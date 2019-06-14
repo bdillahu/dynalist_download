@@ -13,11 +13,18 @@ import re
 import os
 import shutil
 
+# needed for git functionality
+import subprocess
+import shlex
+
 # TODO - implement a "with Archive" and "without Archive" flag - don't do the Archive tree if "without Archive"
 #        Then you can do the Archive once a day and the rest more often
 # TODO - implement a markdown output format - similar to orgmode with repeated '#' for headlines and YAML style metadata blocks
 # SOMEDAY - round trip OrgMode back to dynalist - work in orgmode and sync to dynalist
-
+# ENHANCEMENTS
+## GIT
+### check if it is in a git repository and either create one, or auto commit if it is - to decice
+### check if 'blame' (name and email) is set in git and deal with that
 
 Token = "xxxxxxxx"
 
@@ -28,7 +35,6 @@ Dynalist_add_url  = "https://dynalist.io/api/v1/inbox/add"
 
 # Constants
 body = {'token': Token}
-root_path = "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive"
 text_extension = ".txt"
 org_extension  = ".org"
 md_extension   = ".md"
@@ -78,7 +84,6 @@ list_export_file = "+dynalist_list_export"
 
 # NOTE: json output always includes all data, not available for individual files at this time
 
-# ./dynalist_download.py --file E1p4WnufhtT8YGS9Ufi7MJag --format plain --format orgmode --output_path "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive"
 
 
 def convert_date(timestamp):
@@ -166,8 +171,6 @@ def write_out(args, string, path):
     logger.debug(f"called write_out - {string}")
     # write to stdout unless an output directory is given
 
-#    print(string)
-#    if not path is None:
     if (args.output_path) and not (path is None):
         if (os.path.isdir(path)): 
             path = os.path.join(path, f"Untitled - Root")
@@ -224,7 +227,6 @@ def output_doc(args, raw_json, level, path):
                         value = convert_date(value)
                     write_out(args, "    " * level + f"  - {key} = {value}", path)
                 write_out(args, " \n", path)
-    #            print("    " * level, json.dumps(raw_json, indent = level * 4, separators=(',', ': ')))
         elif format == 'orgmode':
             path = f"{path}{org_extension}"
             
@@ -257,8 +259,6 @@ def output_doc(args, raw_json, level, path):
                         value = convert_date(value)
                     write_out(args, "    " * level + f"  - {key} = {value}", path)
                 write_out(args, " \n", path)
-    #            print("    " * level, json.dumps(raw_json, indent = level * 4, separators=(',', ': ')))
-
 
 
 def output_list(args, raw_json, level, path):
@@ -481,6 +481,28 @@ def get_data(args):
             # there are still other formats being requested
             walk_file_tree(args, doc_list, doc_list['root_file_id'], 0, args.output_path)
 
+
+    if args.git:
+        # right now I'm just calling this from a subprocess
+        # there are various libraries, but they are very complex for a simple call
+#        print(subprocess.run(command, capture_output=True))  // capture_output not available until Python 3.7
+
+        git_cmd = f'git -C "{args.output_path}" add .'
+        print(subprocess.run(shlex.split(git_cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT))
+
+        git_cmd = f'git -C "{args.output_path}" add -u'
+        print(subprocess.run(shlex.split(git_cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT))
+
+        git_cmd = f'git -C "{args.output_path}" commit -a -m "dynalist_download autocommit"'
+        print(subprocess.run(shlex.split(git_cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT))
+
+        git_cmd = f'git -C "{args.output_path}" push origin HEAD'
+#        print(subprocess.run(shlex.split(git_cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT))
+
+
+
+
+
             
 #        for file in doc_list['files']:
 #            if file['type'] == 'folder':
@@ -494,8 +516,6 @@ def get_data(args):
 #        for file_id in doc_list.files:
 #            file_contents = file_content(file_id)
 #            print(file_contents.text)
-
-
 
 
 def get_parser():
@@ -520,7 +540,7 @@ def get_parser():
                         action="store_true")
     parser.add_argument("--format",
                         help="output format - plain text, orgmode - can appear multiple times",
-                        choices=['plain', 'orgmode', 'archive'],
+                        choices=['plain', 'orgmode', 'markdown'],
                         action="append")
     parser.add_argument("--json",
                         help="json output - pretty print",
@@ -529,14 +549,6 @@ def get_parser():
     parser.add_argument("--output_path",
                         help="if directory given, output goes to that location instead of stdout - EXISTING CONTENTS WILL BE DELETED",
                         action="store")
-#    group = parser.add_mutually_exclusive_group()
-#    group.add_argument("--json",
-#                        help="json output to stdout - pretty or raw",
-#                        choices=['pretty', 'raw'],
-#                        action="append")
-#    group.add_argument("--output_path",
-#                        help="if directory given, output goes to that location instead of stdout - EXISTING CONTENTS WILL BE DELETED",
-#                        action="store")
     
     parser.set_defaults(func=get_data)
     
@@ -547,11 +559,6 @@ def get_parser():
 def run_parser(parser):
     args = parser.parse_args()
 
-#    #try:
-#    #    args = parser.parse_args()
-#    #except:
-#    #    parser.print_help()
-#    #    sys.exit(0)
 
     if args.debug:
         logger.setLevel(logging.DEBUG)
