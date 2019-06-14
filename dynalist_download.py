@@ -31,37 +31,16 @@ body = {'token': bdillahuToken}
 root_path = "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive"
 text_extension = ".txt"
 org_extension  = ".org"
-json_raw_filename = "+json_raw"
-json_pretty_filename = "+json_pretty"
-json_extension = ".json"
-list_filename  = "+dynalist_list"
 
 def output_json(args, raw_json):
     logger.debug("called output_json")
 
     if not isinstance(raw_json, dict):
         raw_json = json.loads(raw_json)
-    if 'json' in args.format:
-        if args.output_path:
-            path = os.path.join(args.output_path, f"{json_pretty_filename}{json_extension}")
-            if os.path.exists(path):
-                os.remove(path)
-            f=open(path, "a+")
-            f.write(json.dumps(raw_json, indent=4))
-            f.close()
-        else:    
-            print(json.dumps(raw_json, indent=4))        
-    if 'json-raw' in args.format:
-        if args.output_path:
-            path = os.path.join(args.output_path, f"{json_raw_filename}{json_extension}")
-            if os.path.exists(path):
-                os.remove(path)
-            f=open(path, "a+")
-            json.dump(raw_json, f)
-#            f.write(f"{raw_json}\n")
-            f.close()
-        else:    
-            print(raw_json)
+    if 'pretty' in args.json:
+        print(json.dumps(raw_json, indent=4))        
+    if 'raw' in args.json:
+        print(raw_json)
 
 
 def convert_date(timestamp):
@@ -152,12 +131,7 @@ def write_out(args, string, path, format):
 #    print(string)
 #    if not path is None:
     if (args.output_path) and not (path is None):
-        if (args.list) and (os.path.isdir(path)):
-            if format == 'plain':
-                path = f"{list_filename}{text_extension}"
-            elif format == 'orgmode':
-                path = f"{list_filename}{org_extension}"
-        if (os.path.isdir(path)):
+        if (os.path.isdir(path)): 
             path = os.path.join(path, f"Untitled - Root")
         f=open(os.path.join(args.output_path, path), "a+")
         f.write(f"{string}\n")
@@ -330,20 +304,19 @@ def get_data(args):
         if data['type'] == 'folder':
             if args.output_path:
                 if not (data['title'] == 'Untitled') and (args.dump_all or args.file):
-                    if not 'json' in args.format:
-                        path = os.path.join(path, data['title'])
-                        add_folder(args, path)
-            output_file(args, data, level, path)
+                    path = os.path.join(path, data['title'])
+                    add_folder(args, path)
+            if args.list:
+                output_file(args, data, level, path)
             for child in data['children']:
                 walk_file_tree(args, doc_list, child, level + 1, path)
         else:
-            output_file(args, data, level, path)
+            if args.list:
+                output_file(args, data, level, path)
             if args.dump_all:
                 # call the API and get the details for this document
                 raw_file_contents = file_content(id)
                 file_contents = json.loads(raw_file_contents.text)
-                if ('json' in args.format) or ('json-raw' in args.format):
-                    output_json(args, raw_file_contents.text)
 
                 if args.output_path:
                     path = os.path.join(path, file_contents['title'])
@@ -353,15 +326,6 @@ def get_data(args):
     def cleanup_output_path(args):
         logger.debug(f"called cleanup_output_path")
         logger.debug(f"Removing all existing content - {args.output_path}/*")
-
-        # Remove list output file
-        if args.list:
-            logger.debug(f"Removing list output files")
-
-            # Remove the previous output file
-            output_path = os.path.join(args.output_path, f"{list_filename}{text_extension}")
-            if os.path.exists(output_path):
-                os.remove(output_path)
 
         # Clean out output directory
         if args.dump_all:
@@ -380,6 +344,7 @@ def get_data(args):
                 else:
                     os.remove(filepath)
 
+                    
     def cleanup_file(args, filename):
         logger.debug(f"called cleanup_file - {filename}")
 
@@ -392,39 +357,38 @@ def get_data(args):
             if os.path.exists(path):
                 os.remove(path)
 
+
+################# Main entry point                
                     
     # If no output format specified, use plain
     if not args.format:
         args.format = ['plain']
 
-    if args.list and args.output_path:
-        if ('json' in args.format) or ('json-raw' in args.format):
-            print("ERROR: '--list' and '--format json' not available to write to external files")
-            print("       use '--dump_all' and '--format json'")
-            exit
+    # handle json
+    if args.json:
+        # get list of files
+        raw_doc_list = list_files()
+        doc_list = json.loads(raw_doc_list.text)
+        logger.debug(f"Root File ID: {doc_list['root_file_id']}")
 
+        if 'pretty' in args.json:
+            output_json(args, doc_list)
+        elif 'raw' in args.json:
+            output_json(args, doc_list)
+
+        # - https://stackoverflow.com/questions/8653516/python-list-of-dictionaries-search
+        #data = next(item for item in doc_list['files'] if item['id'] == id)
+
+        for file_id in doc_list['files']:
+           output_json(args, file_content(file_id['id']).text)
+        
+
+        
     # If output to files, clean out existing directory
     if args.output_path:
         if 'dump_all' in args.format:
             cleanup_output_path(args)
-        else:
-            if 'json' in args.format:
-                path = os.path.join(args.output_path, f"{json_pretty_filename}{json_extension}")
-                if os.path.exists(path):
-                    os.remove(path)
-            if 'json-raw' in args.format:
-                path = os.path.join(args.output_path, f"{json_pretty_filename}{json_extension}")
-                if os.path.exists(path):
-                    os.remove(path)
-            if args.list:
-                if 'plain' in args.format:
-                    path = os.path.join(args.output_path, f"{list_filename}{text_extension}")
-                    if os.path.exists(path):
-                        os.remove(path)
-                if 'orgmode' in args.format:
-                    path = os.path.join(args.output_path, f"{list_filename}{org_extension}")
-                    if os.path.exists(path):
-                        os.remove(path)
+
         
     # Get list of all documents
 
@@ -435,8 +399,9 @@ def get_data(args):
             # call the API and get the details for this document
             raw_file_contents = file_content(file_id)
             file_contents = json.loads(raw_file_contents.text)
-            if ('json' in args.format) or ('json-raw' in args.format):
-                output_json(args, file_contents)
+            # TODO - there is no way to enter this right now - printing works fine, but need a call for it
+            #if ('json' in args.format) or ('json-raw' in args.format):
+            #    output_json(args, file_contents)
             if args.output_path:
                 cleanup_file(args, file_contents['title'])
             walk_doc_tree(args, file_contents, 'root', 0, file_contents['title'])
@@ -448,11 +413,6 @@ def get_data(args):
         doc_list = json.loads(raw_doc_list.text)
         logger.debug(f"Root File ID: {doc_list['root_file_id']}")
 
-        #if any(item in args.format for item in ['json', 'json-raw']):
-        if 'json' in args.format:
-            output_json(args, doc_list)
-        elif 'json-raw' in args.format:
-            output_json(args, doc_list)
         if args.format:
             # there are still other formats being requested
             walk_file_tree(args, doc_list, doc_list['root_file_id'], 0, args.output_path)
@@ -488,17 +448,21 @@ def get_parser():
     parser.add_argument("--file",
                         help="Download contents of file - can appear multiple times",
                         action="append")
-    parser.add_argument("--output_path",
-                        help="if directory given, output goes to that location instead of stdout - EXISTING CONTENTS WILL BE DELETED",
-                        action="store")
     parser.add_argument("--dump_all", 
                         help="Dump contents of all documents",
                         action="store_true")
     parser.add_argument("--format",
-                        help="output format - json, plain text, orgmode, archive (json + orgmode) - can appear multiple times",
+                        help="output format - plain text, orgmode - can appear multiple times",
                         choices=['json', 'json-raw', 'plain', 'orgmode', 'archive'],
                         action="append")
     group = parser.add_mutually_exclusive_group()
+    group.add_argument("--json",
+                        help="json output to stdout - pretty or raw",
+                        choices=['pretty', 'raw'],
+                        action="append")
+    group.add_argument("--output_path",
+                        help="if directory given, output goes to that location instead of stdout - EXISTING CONTENTS WILL BE DELETED",
+                        action="store")
     
     
     parser.set_defaults(func=get_data)
