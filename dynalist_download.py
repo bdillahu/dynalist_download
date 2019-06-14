@@ -18,6 +18,7 @@ import shutil
 # TODO - implement a markdown output format - similar to orgmode with repeated '#' for headlines and YAML style metadata blocks
 # SOMEDAY - round trip OrgMode back to dynalist - work in orgmode and sync to dynalist
 
+
 Token = "xxxxxxxx"
 
 Dynalist_list_url = "https://dynalist.io/api/v1/file/list"
@@ -48,32 +49,34 @@ list_export_file = "+dynalist_list_export"
 # ./dynalist_download.py --list --format orgmode
 ## same list in org format
 
-# ./dynalist_download.py --list --format json
-## same list in pretty format
-
-# ./dynalist_download.py --list --format json-raw
-## same list in raw format
-
 # ./dynalist_download.py --list --format plain --format orgmode
 ## same list both ways
 
-# should be able to have any combination of 'plain', 'orgmode', 'json' and 'json-raw'
+# ./dynalist_download.py --json pretty
+## full dump of information in pretty-print json
+
+# ./dynalist_download.py --json raw
+## full dump of information in raw json
+
+# ./dynalist_download.py --json pretty --json raw
+## both pretty and raw json 
+
+# should be able to have any combination of 'plain', 'orgmode', 'json pretty' and 'json raw'
 
 # All of the above with '--output_path "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive"'
 ## output in given directory
-## filename = +dynalist_list_export.<ext> where <ext> is in 'txt', 'org'
-## filename = +dynalist_export.json for json
-## filename = +dynalist_export_raw.json for json-raw
+## filename for plain/org   = +dynalist_list_export.<ext> where <ext> is in 'txt', 'org'
+## filename for json pretty = +dynalist_export.json 
+## filename for json raw    = +dynalist_export_raw.json 
 
-# ./dynalist_download.py --file E1p4WnufhtT8YGS9Ufi7MJag --format plain --format orgmode --format json --output_path "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive"
+# ./dynalist_download.py --file E1p4WnufhtT8YGS9Ufi7MJag --format plain --format orgmode --output_path "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive"
 ## output contents of one file in all formats
-## NOTE - json dumps the entire json world, not just that file
 
-# ./dynalist_download.py --dump_all --format plain --format orgmode --format json --output_path "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive"
+# ./dynalist_download.py --list --dump_all --format plain --format orgmode --json pretty --json raw --output_path "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive"
 ## output contents of all files into file hierarchiy in all formats
 ## This is the main call to get "everything"
 
-
+# NOTE: json output always includes all data, not available for individual files at this time
 
 # ./dynalist_download.py --file E1p4WnufhtT8YGS9Ufi7MJag --format plain --format orgmode --output_path "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive"
 
@@ -186,14 +189,14 @@ def output_json(args, raw_json):
 
     if not isinstance(raw_json, dict):
         raw_json = json.loads(raw_json)
-    if 'json' in args.format:
+    if 'pretty' in args.json:
         if args.output_path:
             f=open(os.path.join(args.output_path, f"{json_export_file}{json_extension}"), "a+")
             json.dump(raw_json, f, indent=4)
             f.close()
         else:
             print(json.dumps(raw_json, indent=4))        
-    if 'json-raw' in args.format:
+    if 'raw' in args.json:
         if args.output_path:
             f=open(os.path.join(args.output_path, f"{json_export_file_raw}{json_extension}"), "a+")
             f.write(f"{raw_json}\n")
@@ -398,6 +401,10 @@ def get_data(args):
             path = os.path.join(args.output_path, f"{filename}{org_extension}")
             if os.path.exists(path):
                 os.remove(path)
+        if 'markdown' in args.format:
+            path = os.path.join(args.output_path, f"{filename}{md_extension}")
+            if os.path.exists(path):
+                os.remove(path)
 
 
 ################# Main entry point                
@@ -413,17 +420,17 @@ def get_data(args):
         parser.error("--git requires --output_path to be set.")
 
     # handle json
-    if ('json' in args.format) or ('json-raw' in args.format):
-        # Remove previous file
-        if 'json' in args.format:
-            path = os.path.join(args.output_path, f"{json_export_file}{json_extension}")
-            if os.path.exists(path):
-                os.remove(path)
-        if 'json-raw' in args.format:
-            path = os.path.join(args.output_path, f"{json_export_file_raw}{json_extension}")
-            if os.path.exists(path):
-                os.remove(path)
-
+    if args.json:
+        if args.output_path:
+            # Remove previous file
+            if 'pretty' in args.json:
+                path = os.path.join(args.output_path, f"{json_export_file}{json_extension}")
+                if os.path.exists(path):
+                    os.remove(path)
+            if 'raw' in args.json:
+                path = os.path.join(args.output_path, f"{json_export_file_raw}{json_extension}")
+                if os.path.exists(path):
+                    os.remove(path)
 
         # get list of files
         raw_doc_list = list_files()
@@ -438,25 +445,14 @@ def get_data(args):
         for file_id in doc_list['files']:
            output_json(args, file_content(file_id['id']).text)
 
-        if 'json' in args.format:
-           args.format.remove('json')
-        if 'json-raw' in args.format:
-           args.format.remove('json-raw')
 
-    # handle list
-    ## list is a subset and special processing
-#    if args.list:
-#        # Remove previous file
-#        path = os.path.join(args.output_path, list_export_file)
-#        if os.path.exists(path):
-#            os.remove(path)
-            
-           
+    
     # If output to files, clean out existing directory
-    if args.output_path:
-        if 'dump_all' in args.format:
-            cleanup_output_path(args)
+    if args.output_path and ('dump_all' in args.format):
+        cleanup_output_path(args)
 
+    if args.list:
+        cleanup_file(args, list_export_file)
         
     # Get list of all documents
 
@@ -524,12 +520,12 @@ def get_parser():
                         action="store_true")
     parser.add_argument("--format",
                         help="output format - plain text, orgmode - can appear multiple times",
-                        choices=['json', 'json-raw', 'plain', 'orgmode', 'archive'],
+                        choices=['plain', 'orgmode', 'archive'],
                         action="append")
-#    parser.add_argument("--json",
-#                        help="json output to stdout - pretty or raw",
-#                        choices=['pretty', 'raw'],
-#                        action="append")
+    parser.add_argument("--json",
+                        help="json output - pretty print",
+                        choices=['pretty', 'raw'],
+                        action="append")
     parser.add_argument("--output_path",
                         help="if directory given, output goes to that location instead of stdout - EXISTING CONTENTS WILL BE DELETED",
                         action="store")
@@ -542,18 +538,7 @@ def get_parser():
 #                        help="if directory given, output goes to that location instead of stdout - EXISTING CONTENTS WILL BE DELETED",
 #                        action="store")
     
-    
     parser.set_defaults(func=get_data)
-#    subparsers = parser.add_subparsers(help="sub-command help")
-
-#    parser_new = subparsers.add_parser("format",
-#                                       help="output format - json, plain text, orgmode, archive (json + orgmode) - can appear multiple times",
-#                                       choices=['json', 'plain', 'orgmode', 'archive'],
-#                                       default='plain',
-#                                       const='plain',
-#                                       nargs='?',
-#                                       action="append")
-#    parser_new.set_defaults(func=get_data)
     
     return parser
 
