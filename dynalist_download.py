@@ -16,7 +16,6 @@ import shutil
 # TODO - implement a "with Archive" and "without Archive" flag - don't do the Archive tree if "without Archive"
 #        Then you can do the Archive once a day and the rest more often
 # TODO - implement a markdown output format - similar to orgmode with repeated '#' for headlines and YAML style metadata blocks
-# TODO - hardcode output filename for list (?)
 
 
 bdillahuToken = "xxxxxxxx"
@@ -32,26 +31,32 @@ body = {'token': bdillahuToken}
 root_path = "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive"
 text_extension = ".txt"
 org_extension  = ".org"
-json_raw_filename = "json_raw"
-json_pretty_filename = "json_pretty"
+json_raw_filename = "+json_raw"
+json_pretty_filename = "+json_pretty"
 json_extension = ".json"
-list_filename  = "dynalist_list"
+list_filename  = "+dynalist_list"
 
 def output_json(args, raw_json):
-    logger.info("called output_json")
+    logger.debug("called output_json")
 
     if not isinstance(raw_json, dict):
         raw_json = json.loads(raw_json)
     if 'json' in args.format:
         if args.output_path:
-            f=open(os.path.join(args.output_path, f"{json_pretty_filename}{json_extension}"), "a+")
+            path = os.path.join(args.output_path, f"{json_pretty_filename}{json_extension}")
+            if os.path.exists(path):
+                os.remove(path)
+            f=open(path, "a+")
             f.write(json.dumps(raw_json, indent=4))
             f.close()
         else:    
             print(json.dumps(raw_json, indent=4))        
     if 'json-raw' in args.format:
         if args.output_path:
-            f=open(os.path.join(args.output_path, f"{json_raw_filename}{json_extension}"), "a+")
+            path = os.path.join(args.output_path, f"{json_raw_filename}{json_extension}")
+            if os.path.exists(path):
+                os.remove(path)
+            f=open(path, "a+")
             json.dump(raw_json, f)
 #            f.write(f"{raw_json}\n")
             f.close()
@@ -140,18 +145,25 @@ def add_folder(args, path):
                 logger.error(f"FILE IN THE WAY! - {path}")
         
                
-def write_out(args, string, path=None):
+def write_out(args, string, path, format):
     logger.debug(f"called write_out - {string}")
     # write to stdout unless an output directory is given
 
 #    print(string)
-    if not path is None:
-        if args.output_path:
-            f=open(os.path.join(args.output_path, path), "a+")
-            f.write(f"{string}\n")
-            f.close()
-        else:    
-            print(string)
+#    if not path is None:
+    if (args.output_path) and not (path is None):
+        if (args.list) and (os.path.isdir(path)):
+            if format == 'plain':
+                path = f"{list_filename}{text_extension}"
+            elif format == 'orgmode':
+                path = f"{list_filename}{org_extension}"
+        if (os.path.isdir(path)):
+            path = os.path.join(path, f"Untitled - Root")
+        f=open(os.path.join(args.output_path, path), "a+")
+        f.write(f"{string}\n")
+        f.close()
+    else:    
+        print(string)
 
             
 
@@ -162,52 +174,52 @@ def git_commit(args):
         
 def output_doc(args, raw_json, level, path):
     # central output dispatcher for documents and their nodes
-    logger.info("called output_doc")
+    logger.debug("called output_doc")
 
     def output_plain(raw_json, level, path):
-        logger.info("called output_json")
+        logger.debug("called output_json")
 
         path = f"{path}{text_extension}"
 
         if 'title' in raw_json:
             # I don't think this will ever happen
-            write_out(args, "    " * level + f"{raw_json['title']}", path)
+            write_out(args, "    " * level + f"{raw_json['title']}", path, 'plain')
         if 'content' in raw_json:
-            write_out(args, "    " * level + f"{raw_json['content']}", path)
+            write_out(args, "    " * level + f"{raw_json['content']}", path, 'plain')
             for key, value in raw_json.items():
                 if (key == 'created') or (key == 'modified'):
                     value = convert_date(value)
-                write_out(args, "    " * level + f"  - {key} = {value}", path)
-            write_out(args, " \n", path)
+                write_out(args, "    " * level + f"  - {key} = {value}", path, 'plain')
+            write_out(args, " \n", path, 'plain')
 #            print("    " * level, json.dumps(raw_json, indent = level * 4, separators=(',', ': ')))
 
     def output_orgmode(raw_json, level, path):
-        logger.info("called output_orgmode")
+        logger.debug("called output_orgmode")
 
         path = f"{path}{org_extension}"
         
         if 'title' in raw_json:
             # I don't think this will ever happen
-            write_out(args, "*" * level + f" {raw_json['title']}", path)
+            write_out(args, "*" * level + f" {raw_json['title']}", path, 'orgmode')
         if 'content' in raw_json:
             content = raw_json['content']
             content = convert_links_to_org(content)
             content = convert_tags_to_org(content)
-            write_out(args, "*" * level + f" {content}", path)
-            write_out(args, ":PROPERTIES:", path)
+            write_out(args, "*" * level + f" {content}", path, 'orgmode')
+            write_out(args, ":PROPERTIES:", path, 'orgmode')
             for key, value in raw_json.items():
                 if (key == 'note') or (key == 'content'):
                     value = convert_links_to_org(value)
                 if not (key == 'note'):
-                    write_out(args, f":{key.upper()}: {value}", path)
-            write_out(args, ":END:", path)
+                    write_out(args, f":{key.upper()}: {value}", path, 'orgmode')
+            write_out(args, ":END:", path, 'orgmode')
 
             # write the note at the end of the properties drawer
-            write_out(args, raw_json['note'], path)
+            write_out(args, raw_json['note'], path, 'orgmode')
 
     def output_archive(raw_json, level):
         # json + orgmode
-        logger.info("called output_archive")
+        logger.debug("called output_archive")
 
         output_json(raw_json)
         output_orgmode(raw_json)
@@ -227,25 +239,25 @@ def output_doc(args, raw_json, level, path):
 
 def output_file(args, raw_json, level, path):
     # central output dispatcher for file list
-    logger.info("called output_file")
+    logger.debug("called output_file")
 
     def output_plain(raw_json, level, path):
-        logger.info("called output_json")
+        logger.debug("called output_json")
 
-        write_out(args, "    " * level + f"{raw_json['title']} - {raw_json['id']} - {raw_json['type']}")
+        write_out(args, "    " * level + f"{raw_json['title']} - {raw_json['id']} - {raw_json['type']}", path, 'plain')
 
     def output_orgmode(raw_json, level, path):
-        logger.info("called output_orgmode")
+        logger.debug("called output_orgmode")
 
-        write_out(args, "*" * level + f" {raw_json['title']}")
-        write_out(args, ":PROPERTIES:")
-        write_out(args, f":ID: {raw_json['id']}")
-        write_out(args, f":TYPE: {raw_json['type']}")
-        write_out(args, ":END:")
+        write_out(args, "*" * level + f" {raw_json['title']}", path, 'orgmode')
+        write_out(args, ":PROPERTIES:", path, 'orgmode')
+        write_out(args, f":ID: {raw_json['id']}", path, 'orgmode')
+        write_out(args, f":TYPE: {raw_json['type']}", path, 'orgmode')
+        write_out(args, ":END:", path, 'orgmode')
 
     def output_archive(raw_json, level):
         # json + orgmode
-        logger.info("called output_archive")
+        logger.debug("called output_archive")
 
         output_json(raw_json)
         output_orgmode(raw_json)
@@ -264,15 +276,14 @@ def output_file(args, raw_json, level, path):
 
 
 def get_data(args):
-    logger.info("called get_data")
+    logger.debug("called get_data")
 
     # This is the main entry point of the program
 
 
-    
     def list_files():
         # get list of all files from API call
-        logger.info("called list_files")
+        logger.debug("called list_files")
 
         payload = {'token':bdillahuToken}
         logger.debug(f"POST: {Dynalist_list_url} {payload}")
@@ -281,30 +292,19 @@ def get_data(args):
         return r
 
     def file_content(file_id):
-        logger.info("called file_content")
+        logger.debug("called file_content")
         payload = {'token':bdillahuToken, 'file_id':file_id}
         logger.debug(f"POST: {Dynalist_read_url} {payload}")
         r = requests.post(Dynalist_read_url, json = payload)
         logger.debug("RESPONSE: " + r.text)
         return r
 
-    def process_doc(file_id):
-        logger.debug(f"called process_doc - {file_id}")
-        raw_file_contents = file_content(file_id)
-        file_contents = json.loads(raw_file_contents.text)
-        if ('json' in args.format) or ('json-raw' in args.format):
-            output_json(args, file_contents)
-        else:
-            if args.output_path:
-                path = os.path.join(path, file_contents['title'])
-            output_doc(args, file_contents, 0, path)
-
 
     def walk_doc_tree(args, file_contents, id, level, path):
         # an individual document (outline)
-        logger.info("called walk_doc_tree - recursive")
+        logger.debug("called walk_doc_tree - recursive")
 
-        logger.info(f"tree root - {file_contents['title']} - {id}")
+        logger.debug(f"tree root - {file_contents['title']} - {id}")
         if 'nodes' in file_contents:
             data = next(item for item in file_contents['nodes'] if item['id'] == id)
                 
@@ -319,19 +319,21 @@ def get_data(args):
         else:
             output_doc(args, file_contents, level, path)
 
+            
     def walk_file_tree(args, doc_list, id, level, path):
         # process the entire list of documents (files and folders)
-        logger.info("called walk_file_tree - recursive")
+        logger.debug("called walk_file_tree - recursive")
 
-        logger.info(f"tree root - {id}")
+        logger.debug(f"tree root - {id}")
         # - https://stackoverflow.com/questions/8653516/python-list-of-dictionaries-search
         data = next(item for item in doc_list['files'] if item['id'] == id)
         if data['type'] == 'folder':
-            output_file(args, data, level, path)
             if args.output_path:
-                if not data['title'] == 'Untitled':
-                    path = os.path.join(path, data['title'])
-                    add_folder(args, path)
+                if not (data['title'] == 'Untitled') and (args.dump_all or args.file):
+                    if not 'json' in args.format:
+                        path = os.path.join(path, data['title'])
+                        add_folder(args, path)
+            output_file(args, data, level, path)
             for child in data['children']:
                 walk_file_tree(args, doc_list, child, level + 1, path)
         else:
@@ -348,39 +350,83 @@ def get_data(args):
                 walk_doc_tree(args, file_contents, 'root', level, path)
             level -= 1
 
+    def cleanup_output_path(args):
+        logger.debug(f"called cleanup_output_path")
+        logger.debug(f"Removing all existing content - {args.output_path}/*")
+
+        # Remove list output file
+        if args.list:
+            logger.debug(f"Removing list output files")
+
+            # Remove the previous output file
+            output_path = os.path.join(args.output_path, f"{list_filename}{text_extension}")
+            if os.path.exists(output_path):
+                os.remove(output_path)
+
+        # Clean out output directory
+        if args.dump_all:
+            # I don't just blow away everything because I want .git to stay
+            
+            # Get list of all files and directories
+            filelist = os.listdir(args.output_path)
         
+            # Remove .git from list
+            filelist.remove('.git')
+        
+            for file in filelist:
+                filepath = os.path.join(args.output_path, file)
+                if os.path.isdir(filepath):
+                    shutil.rmtree(filepath)
+                else:
+                    os.remove(filepath)
+
+    def cleanup_file(args, filename):
+        logger.debug(f"called cleanup_file - {filename}")
+
+        if 'plain' in args.format:
+            path = os.path.join(args.output_path, f"{filename}{text_extension}")
+            if os.path.exists(path):
+                os.remove(path)
+        if 'orgmode' in args.format:
+            path = os.path.join(args.output_path, f"{filename}{org_extension}")
+            if os.path.exists(path):
+                os.remove(path)
 
                     
     # If no output format specified, use plain
     if not args.format:
         args.format = ['plain']
 
+    if args.list and args.output_path:
+        if ('json' in args.format) or ('json-raw' in args.format):
+            print("ERROR: '--list' and '--format json' not available to write to external files")
+            print("       use '--dump_all' and '--format json'")
+            exit
+
     # If output to files, clean out existing directory
     if args.output_path:
-        logger.debug(f"Removing all contents - {args.output_path}/*")
-
-        # I don't just blow away everything because I wand .git to stay
+        if 'dump_all' in args.format:
+            cleanup_output_path(args)
+        else:
+            if 'json' in args.format:
+                path = os.path.join(args.output_path, f"{json_pretty_filename}{json_extension}")
+                if os.path.exists(path):
+                    os.remove(path)
+            if 'json-raw' in args.format:
+                path = os.path.join(args.output_path, f"{json_pretty_filename}{json_extension}")
+                if os.path.exists(path):
+                    os.remove(path)
+            if args.list:
+                if 'plain' in args.format:
+                    path = os.path.join(args.output_path, f"{list_filename}{text_extension}")
+                    if os.path.exists(path):
+                        os.remove(path)
+                if 'orgmode' in args.format:
+                    path = os.path.join(args.output_path, f"{list_filename}{org_extension}")
+                    if os.path.exists(path):
+                        os.remove(path)
         
-        # Get list of all files and directories
-        filelist = os.listdir(args.output_path)
-
-        # Remove .git from list
-        filelist.remove('.git')
-
-        for file in filelist:
-            filepath = os.path.join(args.output_path, file)
-            if os.path.isdir(filepath):
-                shutil.rmtree(filepath)
-            else:
-                os.remove(filepath)
-                
-    
     # Get list of all documents
-#    if args.list:
-#        raw_doc_list = list_files()
-#        doc_list = json.loads(raw_doc_list.text)
-#        #print(json.dumps(doc_list, indent=4))
-#        output(args, doc_list, 0)
 
     # Given a file_id (manually obtained or availalbe from the all-files list)
     # retrieve contents of that file, walking the node tree
@@ -391,27 +437,22 @@ def get_data(args):
             file_contents = json.loads(raw_file_contents.text)
             if ('json' in args.format) or ('json-raw' in args.format):
                 output_json(args, file_contents)
-
             if args.output_path:
-                path = os.path.join(path, file_contents['title'])
-            else:
-                path = args.output_path
-            walk_doc_tree(args, file_contents, 'root', 0, path)
+                cleanup_file(args, file_contents['title'])
+            walk_doc_tree(args, file_contents, 'root', 0, file_contents['title'])
     else:
         # anything else --list or --dump_all
 
         # get list of files
         raw_doc_list = list_files()
         doc_list = json.loads(raw_doc_list.text)
-        logger.info(f"Root File ID: {doc_list['root_file_id']}")
+        logger.debug(f"Root File ID: {doc_list['root_file_id']}")
 
         #if any(item in args.format for item in ['json', 'json-raw']):
         if 'json' in args.format:
             output_json(args, doc_list)
-#            args.format.remove('json')
         elif 'json-raw' in args.format:
             output_json(args, doc_list)
-#            args.format.remove('json-raw')
         if args.format:
             # there are still other formats being requested
             walk_file_tree(args, doc_list, doc_list['root_file_id'], 0, args.output_path)
@@ -457,6 +498,9 @@ def get_parser():
                         help="output format - json, plain text, orgmode, archive (json + orgmode) - can appear multiple times",
                         choices=['json', 'json-raw', 'plain', 'orgmode', 'archive'],
                         action="append")
+    group = parser.add_mutually_exclusive_group()
+    
+    
     parser.set_defaults(func=get_data)
 #    subparsers = parser.add_subparsers(help="sub-command help")
 
@@ -484,7 +528,7 @@ def run_parser(parser):
 
     if args.debug:
         logger.setLevel(logging.DEBUG)
-        logger.info("Debug level set")
+        logger.debug("Debug level set")
 
     # Call the function
     args.func(args)
