@@ -78,7 +78,9 @@ list_export_file = "+dynalist_list_export"
 # ./dynalist_download.py --file E1p4WnufhtT8YGS9Ufi7MJag --format plain --format orgmode --output_path "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive"
 ## output contents of one file in all formats
 
-# ./dynalist_download.py --list --dump_all --format plain --format orgmode --json pretty --json raw --output_path "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive"
+# add '--git' to have it commit changes if the output_path is a git repository
+
+# ./dynalist_download.py --list --dump_all --format plain --format orgmode --json pretty --json raw --output_path "/mnt/filer/Filing/Programming/2019-06-11_DynalistDownload/dynalist_archive" --git
 ## output contents of all files into file hierarchiy in all formats
 ## This is the main call to get "everything"
 
@@ -419,6 +421,14 @@ def get_data(args):
     if args.git and (args.output_path is None):
         parser.error("--git requires --output_path to be set.")
 
+    # If output to files, clean out existing directory
+    if args.output_path and args.dump_all:
+        cleanup_output_path(args)
+
+    if args.list:
+        cleanup_file(args, list_export_file)
+
+        
     # handle json
     if args.json:
         if args.output_path:
@@ -447,12 +457,6 @@ def get_data(args):
 
 
     
-    # If output to files, clean out existing directory
-    if args.output_path and ('dump_all' in args.format):
-        cleanup_output_path(args)
-
-    if args.list:
-        cleanup_file(args, list_export_file)
         
     # Get list of all documents
 
