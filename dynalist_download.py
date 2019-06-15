@@ -501,8 +501,8 @@ def get_data(args):
         git_cmd = f'git -C "{args.output_path}" commit -a -m "dynalist_download autocommit"'
         print(subprocess.run(shlex.split(git_cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT))
 
-        git_cmd = f'git -C "{args.output_path}" push origin HEAD'
-#        print(subprocess.run(shlex.split(git_cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT))
+        git_cmd = f'git -C "{args.output_path}" push origin master'
+        print(subprocess.run(shlex.split(git_cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT))
 
 
 
