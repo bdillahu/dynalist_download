@@ -485,6 +485,7 @@ def get_data(args):
     if args.git:
         # right now I'm just calling this from a subprocess
         # there are various libraries, but they are very complex for a simple call
+        # - https://stackoverflow.com/a/15315706
 #        print(subprocess.run(command, capture_output=True))  // capture_output not available until Python 3.7
 
         git_cmd = f'git -C "{args.output_path}" add .'
