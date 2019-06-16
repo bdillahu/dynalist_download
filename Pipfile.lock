@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "9e78bca548285a0d7e0f4c2201c8c81f5ffcde2e0eb95d76d24c76c9dec7dd3d"
+            "sha256": "c045f37e59727cad3342fd83d33d7402b7d0392c583bfcbb41fc2829d14201dc"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -37,20 +37,6 @@
             ],
             "version": "==2.8"
         },
-        "pudb": {
-            "hashes": [
-                "sha256:ac30cfc64580958ab7265decb4cabb9141f08781ff072e9a336d5a7942ce35a6"
-            ],
-            "index": "pypi",
-            "version": "==2019.1"
-        },
-        "pygments": {
-            "hashes": [
-                "sha256:71e430bc85c88a430f000ac1d9b331d2407f681d6f6aec95e8bcfbc3df5b0127",
-                "sha256:881c4c157e45f30af185c1ffe8d549d48ac9127433f2c380c24b84572ad66297"
-            ],
-            "version": "==2.4.2"
-        },
         "requests": {
             "hashes": [
                 "sha256:11e007a8a2aa0323f5a921e9e6a2d7e4e67d9877e85773fba9ba6419025cbeb4",
@@ -65,14 +51,28 @@
                 "sha256:dbe59173209418ae49d485b87d1681aefa36252ee85884c31346debd19463232"
             ],
             "version": "==1.25.3"
+        }
+    },
+    "develop": {
+        "pudb": {
+            "hashes": [
+                "sha256:ac30cfc64580958ab7265decb4cabb9141f08781ff072e9a336d5a7942ce35a6"
+            ],
+            "index": "pypi",
+            "version": "==2019.1"
+        },
+        "pygments": {
+            "hashes": [
+                "sha256:71e430bc85c88a430f000ac1d9b331d2407f681d6f6aec95e8bcfbc3df5b0127",
+                "sha256:881c4c157e45f30af185c1ffe8d549d48ac9127433f2c380c24b84572ad66297"
+            ],
+            "version": "==2.4.2"
         },
         "urwid": {
             "hashes": [
-                "sha256:644d3e3900867161a2fc9287a9762753d66bd194754679adb26aede559bcccbc",
-                "sha256:c2f0135ffe558d0eeb773debb2f0b02bbdbe30c3c402b78bd6e2736070c5a566"
+                "sha256:644d3e3900867161a2fc9287a9762753d66bd194754679adb26aede559bcccbc"
             ],
             "version": "==2.0.1"
         }
-    },
-    "develop": {}
+    }
 }

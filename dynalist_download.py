@@ -20,6 +20,7 @@ import shlex
 # TODO - implement a "with Archive" and "without Archive" flag - don't do the Archive tree if "without Archive"
 #        Then you can do the Archive once a day and the rest more often
 # TODO - implement a markdown output format - similar to orgmode with repeated '#' for headlines and YAML style metadata blocks
+# TODO - just plain --list fails
 # SOMEDAY - round trip OrgMode back to dynalist - work in orgmode and sync to dynalist
 # ENHANCEMENTS
 ## GIT
@@ -174,8 +175,10 @@ def write_out(args, string, path):
     # write to stdout unless an output directory is given
 
     if (args.output_path) and not (path is None):
-        if (os.path.isdir(path)): 
+        if (os.path.isdir(path)):
+            # should never be called
             path = os.path.join(path, f"Untitled - Root")
+        # remove problem characters from path
         f=open(os.path.join(args.output_path, path), "a+")
         f.write(f"{string}\n")
         f.close()
@@ -221,7 +224,7 @@ def output_doc(args, raw_json, level, path):
 
             if 'title' in raw_json:
                 # I don't think this will ever happen
-                write_out(args, "    " * level + f"{raw_json['title']}", path)
+                write_out(args, "    " * level + f"{raw_json['title'].replace(r'/', '~')}", path)
             if 'content' in raw_json:
                 write_out(args, "    " * level + f"{raw_json['content']}", path)
                 for key, value in raw_json.items():
@@ -366,7 +369,9 @@ def get_data(args):
                 file_contents = json.loads(raw_file_contents.text)
 
                 if args.output_path:
-                    path = os.path.join(path, file_contents['title'])
+                    title = file_contents['title'].replace(r'/', '~')
+
+                    path = os.path.join(path, title)
                 walk_doc_tree(args, file_contents, 'root', level, path)
             level -= 1
 
@@ -383,6 +388,7 @@ def get_data(args):
         
             # Remove .git from list
             filelist.remove('.git')
+            filelist.remove('.gitignore')
         
             for file in filelist:
                 filepath = os.path.join(args.output_path, file)
