@@ -369,6 +369,7 @@ def get_data(args):
                 file_contents = json.loads(raw_file_contents.text)
 
                 if args.output_path:
+                    # if there is a '/' in a document title, it messes up saving so replace with '~'
                     title = file_contents['title'].replace(r'/', '~')
 
                     path = os.path.join(path, title)
@@ -499,17 +500,32 @@ def get_data(args):
 #        print(subprocess.run(command, capture_output=True))  // capture_output not available until Python 3.7
 
         git_cmd = f'git -C "{args.output_path}" add .'
-        print(subprocess.run(shlex.split(git_cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT))
+        print(git_cmd)
+        result = subprocess.run(shlex.split(git_cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if not result.returncode == 0:
+            print(result.stdout.decode("utf-8"))
 
         git_cmd = f'git -C "{args.output_path}" add -u'
-        print(subprocess.run(shlex.split(git_cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT))
+        print(git_cmd)
+        result = subprocess.run(shlex.split(git_cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if not result.returncode == 0:
+            print(result.stdout.decode("utf-8"))
 
         git_cmd = f'git -C "{args.output_path}" commit -a -m "dynalist_download autocommit"'
-        print(subprocess.run(shlex.split(git_cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT))
+        print(git_cmd)
+        result = subprocess.run(shlex.split(git_cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if not result.returncode == 0:
+            print("Error: " + result.stdout.decode("utf-8"))
+        else:
+            print(result.stdout.decode("utf-8") )
 
-        git_cmd = f'git -C "{args.output_path}" push origin master'
-        print(subprocess.run(shlex.split(git_cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT))
-
+        #git_cmd = f'git -C "{args.output_path}" push origin master'
+        #print(git_cmd)
+        #result = subprocess.run(shlex.split(git_cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        #if not result.returncode == 0:
+        #    print("Error: " + result.stdout.decode("utf-8"))
+        #else:
+        #    print(result.stdout.decode("utf-8") )
 
 
 
