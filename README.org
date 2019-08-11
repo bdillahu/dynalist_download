@@ -1,19 +1,84 @@
-* Initial setup
-** Install pipenv
+* Dynalist Download
+
+I have enjoyed using Dynalist off and on over the years. Having an online outliner that I can share documents with friends/family is important to the way I like to work. I seem to "think in outlines" so Dynalist really works well for my various lists, notes and reference materials. 
+
+The downside is that I am a bit fanatical about keeping a history of my notes, old versions, revisions, when things were changed, whatever. I want to be able to go back in time and see what changed when.
+
+I've tried various formats of notetaking (org-mode, etc.) with a datetree type format, which keeps date history well, but doesn't deal as well with projects/todo lists/etc. Having ToDo's scattered around where they landed chronologically doesn't work in my head when I'm planning a project.
+
+So, I moved back to Dynalist again, but with one change - I would keep my history in a git repository.
+
+Dynalist Pro provides a daily backup file, and I keep those also, but I wanted a more granular history, thus dynalist_download was born.
+
+** Features
+
+*** List all documents
+
+*** Check into git after download if output path is a git repository
+
+*** Download all files or single file
+
+*** Dump contents of documents in plain text, orgmode or markdown file formats
+
+*** Export contents of documents in json, either pretty printed or raw
+
+** Basic Usage
+
+*YOU MUST SET THE TOKEN CODE FROM DYNALIST AT THE START OF THE SCRIPT*
+
+Sometime I'll make this an environment variable or something, but right now it's hardcoded.
+
+See https://dynalist.io/developer for information on getting your API key.
+
+Make sure and keep your key confidential - this gives full access to your Dynalist files.
+
+#+BEGIN_QUOTE
+usage: Dynalist_Download [-h] [--debug] [--gui] [--list] [--git] [--file FILE]
+                         [--dump_all] [--format {plain,orgmode,markdown}]
+                         [--json {pretty,raw}] [--output_path OUTPUT_PATH]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --debug               enable debugging output
+  --gui                 enable gui
+  --list                List all documents
+  --git                 If output_path is a git repository, check in new data
+                        after retrieval
+  --file FILE           Download contents of file - can appear multiple times
+  --dump_all            Dump contents of all documents
+  --format {plain,orgmode,markdown}
+                        output format - plain text, orgmode - can appear
+                        multiple times
+  --json {pretty,raw}   json output - pretty print
+  --output_path OUTPUT_PATH
+                        if directory given, output goes to that location
+                        instead of stdout - EXISTING CONTENTS WILL BE DELETED
+#+END_QUOTE
+
+I have a crontab that runs hourly (that's enough granularity for me now) that calls the script dynalist_archive_run.sh (in the bin directory in this repository) that downloads most everything and checks it into git. 
+
+Note I'm having issues with the push command to my remote git server - something not happy with ssh-keys that I haven't gotten straight yet.
+
+** To Do
+
+*** Handle attachments - right now they are not downloaded
+
+** Initial setup
+*** Install pipenv
 - https://realpython.com/pipenv-guide/
 
 #+BEGIN_SRC shell
 sudo pip3 install pipenv
 #+END_SRC
 
-** Set up virtual environment
+*** Set up virtual environment
 
 #+BEGIN_SRC shell
 pipenv --three shell
 pipenv install requests
 #+END_SRC
 
-** To run a command in the environment
+*** To run a command in the environment
 
 #+BEGIN_SRC shell
 pipenv shell
@@ -28,4 +93,4 @@ without launching a shell
 pipenv run <command>
 #+END_SRC
 
-** Need to uninstall pudb3 from final, shipping enironment
+*** Need to uninstall pudb3 from final, shipping environment
