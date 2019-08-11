@@ -12,15 +12,15 @@ Dynalist Pro provides a daily backup file, and I keep those also, but I wanted a
 
 ** Features
 
-*** List all documents
+- List all documents
 
-*** Check into git after download if output path is a git repository
+- Check into git after download if output path is a git repository
 
-*** Download all files or single file
+- Download all files or single file
 
-*** Dump contents of documents in plain text, orgmode or markdown file formats
+- Dump contents of documents in plain text, orgmode or markdown file formats
 
-*** Export contents of documents in json, either pretty printed or raw
+- Export contents of documents in json, either pretty printed or raw
 
 ** Basic Usage
 
