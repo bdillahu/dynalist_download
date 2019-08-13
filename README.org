@@ -32,6 +32,8 @@ See https://dynalist.io/developer for information on getting your API key.
 
 Make sure and keep your key confidential - this gives full access to your Dynalist files.
 
+NOTE: gui option doesn't work currently, if ever
+
 #+BEGIN_EXAMPLE
 usage: Dynalist_Download [-h] [--debug] [--gui] [--list] [--git] [--file FILE]
                          [--dump_all] [--format {plain,orgmode,markdown}]
