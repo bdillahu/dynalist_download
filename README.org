@@ -32,7 +32,7 @@ See https://dynalist.io/developer for information on getting your API key.
 
 Make sure and keep your key confidential - this gives full access to your Dynalist files.
 
-#+BEGIN_QUOTE
+#+BEGIN_EXAMPLE
 usage: Dynalist_Download [-h] [--debug] [--gui] [--list] [--git] [--file FILE]
                          [--dump_all] [--format {plain,orgmode,markdown}]
                          [--json {pretty,raw}] [--output_path OUTPUT_PATH]
@@ -53,7 +53,7 @@ optional arguments:
   --output_path OUTPUT_PATH
                         if directory given, output goes to that location
                         instead of stdout - EXISTING CONTENTS WILL BE DELETED
-#+END_QUOTE
+#+END_EXAMPLE
 
 I have a crontab that runs hourly (that's enough granularity for me now) that calls the script dynalist_archive_run.sh (in the bin directory in this repository) that downloads most everything and checks it into git. 
 
