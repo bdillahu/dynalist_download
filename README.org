@@ -59,7 +59,7 @@ optional arguments:
 
 I have a crontab that runs hourly (that's enough granularity for me now) that calls the script dynalist_archive_run.sh (in the bin directory in this repository) that downloads most everything and checks it into git. 
 
-Note I'm having issues with the push command to my remote git server - something not happy with ssh-keys that I haven't gotten straight yet.
+For some time I was having issues with the push command to my remote git server - something not happy with ssh-keys that I haven't gotten straight yet. Finally saw a reference online to just using a post-commit hook in git - that works like a champ so far.
 
 ** To Do
 
